@@ -77,7 +77,6 @@ jobs:
         kubectl apply -f k8s/configmap.yaml
         kubectl apply -f k8s/deployment.yaml
         kubectl apply -f k8s/service.yaml
-        kubectl apply -f k8s/hpa.yaml
         
         # Wait for deployment to be ready
         kubectl rollout status deployment/wa-gateway -n wa-gateway --timeout=300s
