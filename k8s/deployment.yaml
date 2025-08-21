@@ -27,8 +27,17 @@ spec:
         envFrom:
         - configMapRef:
             name: wa-gateway-config
-        - secretRef:
-            name: wa-gateway-secret-production
+        env:
+        - name: KEY
+          valueFrom:
+            secretKeyRef:
+              name: wa-gateway-secret-production
+              key: KEY
+        - name: WEBHOOK_BASE_URL
+          valueFrom:
+            secretKeyRef:
+              name: wa-gateway-secret-production
+              key: WEBHOOK_BASE_URL
         resources:
           requests:
             memory: "256Mi"
@@ -53,6 +62,9 @@ spec:
           mountPath: /app/media
         - name: wa-credentials-storage
           mountPath: /app/wa_credentials
+        - name: secrets-store
+          mountPath: /mnt/secrets-store
+          readOnly: true
       volumes:
       - name: media-storage
         persistentVolumeClaim:
@@ -60,6 +72,12 @@ spec:
       - name: wa-credentials-storage
         persistentVolumeClaim:
           claimName: wa-gateway-credentials-pvc
+      - name: secrets-store
+        csi:
+          driver: secrets-store.csi.x-k8s.io
+          readOnly: true
+          volumeAttributes:
+            secretProviderClass: wa-gateway-secrets
 ---
 apiVersion: v1
 kind: PersistentVolumeClaim
