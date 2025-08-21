@@ -3,13 +3,6 @@ name: Deploy to EKS
 on:
   push:
     branches: [main, master]
-    - name: Update Kubernetes deployment image
-      env:
-        IMAGE_URI: ${{ steps.build-image.outputs.image }}
-      run: |
-        # Update the deployment YAML with the new image
-        sed -i "s|590183660812.dkr.ecr.us-east-1.amazonaws.com/wa-gateway:latest|$IMAGE_URI|g" k8s/deployment.yamlest:
-    branches: [main, master]
 
 env:
   AWS_REGION: us-east-1
