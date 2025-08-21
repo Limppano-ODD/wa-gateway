@@ -27,6 +27,7 @@ jobs:
         role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
         aws-region: ${{ env.AWS_REGION }}
         role-session-name: GitHubActions-${{ github.run_id }}
+        audience: sts.amazonaws.com
 
     - name: Login to Amazon ECR
       id: login-ecr
@@ -53,6 +54,8 @@ jobs:
     - name: Update kubeconfig
       run: |
         aws eks update-kubeconfig --region ${{ env.AWS_REGION }} --name ${{ env.EKS_CLUSTER_NAME }}
+        kubectl config current-context
+        kubectl auth can-i get pods --all-namespaces
 
     - name: Update Kubernetes deployment image
       env:
@@ -64,7 +67,7 @@ jobs:
         # Replace placeholders with actual values
         sed -i "s/590183660812/${{ secrets.AWS_ACCOUNT_ID }}/g" k8s/namespace.yaml
         sed -i "s/590183660812/${{ secrets.AWS_ACCOUNT_ID }}/g" k8s/service.yaml
-        sed -i "s/8c9e1f71-bb96-4dad-a5fb-ce6e2d5edc01/${{ secrets.AWS_CERTIFICATE_ID }}/g" k8s/service.yaml
+        sed -i "s/91b271ed-1ebb-43bb-b64e-8c973754a885/${{ secrets.AWS_CERTIFICATE_ID }}/g" k8s/service.yaml
 
     - name: Deploy to EKS
       run: |

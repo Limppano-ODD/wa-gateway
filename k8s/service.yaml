@@ -21,16 +21,12 @@ metadata:
   namespace: wa-gateway
   annotations:
     kubernetes.io/ingress.class: "nginx"
-    nginx.ingress.kubernetes.io/ssl-redirect: "true"
-    nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
-    cert-manager.io/cluster-issuer: "letsencrypt-dns"
+  labels:
+    app: wa-gateway
 spec:
-  tls:
-  - hosts:
-    - wa-gateway.odd.com.br
-    secretName: wa-gateway-tls
+  ingressClassName: nginx
   rules:
-  - host: wa-gateway.odd.com.br
+  - host: wa-gateway.limppano.com.br
     http:
       paths:
       - path: /
