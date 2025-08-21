@@ -2,18 +2,8 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: wa-gateway
-  namespace: waapiVersion: v1
-kind: PersistentVolumeClaim
-metadata:
-  name: wa-gateway-credentials-pvc
   namespace: wa-gateway
-spec:
-  accessModes:
-    - ReadWriteOnce
-  resources:
-    requests:
-      storage: 10Gi
-  storageClassName: gp3-sclabels:
+  labels:
     app: wa-gateway
 spec:
   # Note: Using 1 replica because WhatsApp sessions are stored locally
@@ -63,35 +53,13 @@ spec:
           mountPath: /app/media
         - name: wa-credentials-storage
           mountPath: /app/wa_credentials
-        - name: secrets-store
-          mountPath: /mnt/secrets-store
-          readOnly: true
       volumes:
       - name: media-storage
         persistentVolumeClaim:
-          claimName: wa-gateway-media-pvc
+          claimName: wa-gateway-media-pvc-new
       - name: wa-credentials-storage
         persistentVolumeClaim:
           claimName: wa-gateway-credentials-pvc
-      - name: secrets-store
-        csi:
-          driver: secrets-store.csi.k8s.io
-          readOnly: true
-          volumeAttributes:
-            secretProviderClass: wa-gateway-secrets
----
-apiVersion: v1
-kind: PersistentVolumeClaim
-metadata:
-  name: wa-gateway-media-pvc
-  namespace: wa-gateway
-spec:
-  accessModes:
-    - ReadWriteOnce
-  resources:
-    requests:
-      storage: 10Gi
-  storageClassName: gp3-sc
 ---
 apiVersion: v1
 kind: PersistentVolumeClaim
@@ -104,4 +72,4 @@ spec:
   resources:
     requests:
       storage: 10Gi
-  storageClassName: gp2
+  storageClassName: gp3-sc
