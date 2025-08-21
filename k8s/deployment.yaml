@@ -74,7 +74,7 @@ spec:
           claimName: wa-gateway-credentials-pvc
       - name: secrets-store
         csi:
-          driver: secrets-store.csi.x-k8s.io
+          driver: secrets-store.csi.k8s.io
           readOnly: true
           volumeAttributes:
             secretProviderClass: wa-gateway-secrets
