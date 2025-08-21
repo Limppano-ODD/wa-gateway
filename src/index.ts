@@ -28,6 +28,17 @@ app.onError(globalErrorMiddleware);
 app.notFound(notFoundMiddleware);
 
 /**
+ * health check endpoint
+ */
+app.get("/health", (c) => {
+  return c.json({ 
+    status: "OK", 
+    timestamp: new Date().toISOString(),
+    version: "4.3.2"
+  });
+});
+
+/**
  * serve media message static files
  */
 app.use(

@@ -1,0 +1,77 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: wa-gateway
+  namespace: wa-gateway
+  labels:
+    app: wa-gateway
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: wa-gateway
+  template:
+    metadata:
+      labels:
+        app: wa-gateway
+    spec:
+      serviceAccountName: wa-gateway-sa
+      containers:
+      - name: wa-gateway
+        image: 590183660812.dkr.ecr.us-east-1.amazonaws.com/wa-gateway:latest
+        ports:
+        - containerPort: 5001
+          name: http
+        envFrom:
+        - configMapRef:
+            name: wa-gateway-config
+        - secretRef:
+            name: wa-gateway-secret-production
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "250m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 5001
+          initialDelaySeconds: 30
+          periodSeconds: 30
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 5001
+          initialDelaySeconds: 5
+          periodSeconds: 10
+        volumeMounts:
+        - name: media-storage
+          mountPath: /app/media
+        - name: secrets-store
+          mountPath: /mnt/secrets-store
+          readOnly: true
+      volumes:
+      - name: media-storage
+        persistentVolumeClaim:
+          claimName: wa-gateway-media-pvc
+      - name: secrets-store
+        csi:
+          driver: secrets-store.csi.k8s.io
+          readOnly: true
+          volumeAttributes:
+            secretProviderClass: wa-gateway-secrets
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: wa-gateway-media-pvc
+  namespace: wa-gateway
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 10Gi
+  storageClassName: gp2

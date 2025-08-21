@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: wa-gateway
+  labels:
+    name: wa-gateway
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: wa-gateway-sa
+  namespace: wa-gateway
+  annotations:
+    eks.amazonaws.com/role-arn: arn:aws:iam::590183660812:role/wa-gateway-irsa-role
