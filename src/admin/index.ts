@@ -440,7 +440,18 @@ export const createAdminController = () => {
               alert('Please enter a session name');
               return;
             }
-            makeRequest('POST', '/session/start', { session });
+            
+            const apiBaseUrl = getApiBaseUrl();
+            const apiKey = getApiKey();
+            
+            // Build URL with session parameter and API key
+            let url = apiBaseUrl + '/session/start?session=' + encodeURIComponent(session);
+            if (apiKey) {
+              url += '&key=' + encodeURIComponent(apiKey);
+            }
+            
+            // Open URL in new window
+            window.open(url, '_blank', 'width=600,height=600,scrollbars=yes,resizable=yes');
           }
 
           function logoutSession() {
