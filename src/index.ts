@@ -14,8 +14,20 @@ import { createWebhookMessage } from "./webhooks/message";
 import { createWebhookSession } from "./webhooks/session";
 import { createProfileController } from "./controllers/profile";
 import { serveStatic } from "@hono/node-server/serve-static";
+import { createAdminController } from "./controllers/admin";
+import { createDashboardController } from "./controllers/dashboard";
+import fs from "fs";
+import path from "path";
+// Initialize database
+import "./database/db";
 
-const app = new Hono();
+
+
+type Variables = {
+  user: User;
+};
+
+const app = new Hono<{ Variables: Variables }>();
 
 app.use(
   logger((...params) => {
@@ -28,6 +40,17 @@ app.onError(globalErrorMiddleware);
 app.notFound(notFoundMiddleware);
 
 /**
+ * Welcome page
+ */
+app.get("/", (c) => {
+  const indexHtml = fs.readFileSync(
+    path.join(__dirname, "views", "index.html"),
+    "utf-8"
+  );
+  return c.html(indexHtml);
+});
+
+/**
  * serve media message static files
  */
 app.use(
@@ -37,6 +60,21 @@ app.use(
   })
 );
 
+/**
+ * Health check endpoint for Docker
+ */
+app.get("/health", (c) => {
+  return c.json({ status: "ok", timestamp: new Date().toISOString() });
+});
+
+/**
+ * dashboard routes
+ */
+app.route("/dashboard", createDashboardController());
+/**
+ * admin routes
+ */
+app.route("/admin", createAdminController());
 /**
  * session routes
  */
@@ -66,31 +104,101 @@ whastapp.onConnected((session) => {
   console.log(`session: '${session}' connected`);
 });
 
-// Implement Webhook
-if (env.WEBHOOK_BASE_URL) {
-  const webhookProps: CreateWebhookProps = {
-    baseUrl: env.WEBHOOK_BASE_URL,
+// Implement Per-User Webhook
+import { User, userDb } from "./database/db";
+import axios from "axios";
+import { MessageReceived } from "wa-multi-session";
+import { messageStore } from "./utils/message-store";
+
+// Helper function to get callback URL for a session
+const getCallbackForSession = (sessionName: string): string | null => {
+  const user = userDb.getUserBySessionName(sessionName);
+  return user?.callback_url || null;
+};
+
+// Message webhook with per-user callbacks
+whastapp.onMessageReceived(async (message: MessageReceived) => {
+  // Store message for later retrieval (for quoting/replying)
+  messageStore.storeMessage(message);
+
+  if (message.key.fromMe || message.key.remoteJid?.includes("broadcast"))
+    return;
+
+  const callbackUrl = getCallbackForSession(message.sessionId);
+  if (!callbackUrl) {
+    console.log(`No callback URL configured for session: ${message.sessionId}`);
+    return;
+  }
+
+  const endpoint = `${callbackUrl}`;
+
+  
+  const body = {
+    session: message.sessionId,
+    from: message.key.remoteJid ?? null,
+    messageId: message.key.id,
+    message:
+      message.message?.conversation ||
+      message.message?.extendedTextMessage?.text ||
+      message.message?.imageMessage?.caption ||
+      message.message?.videoMessage?.caption ||
+      message.message?.documentMessage?.caption ||
+      message.message?.contactMessage?.displayName ||
+      message.message?.locationMessage?.comment ||
+      message.message?.liveLocationMessage?.caption ||
+      null,
+    media: {
+      image: null, // TODO: implement media handling
+      video: null,
+      document: null,
+      audio: null,
+    },
   };
 
-  // message webhook
-  whastapp.onMessageReceived(createWebhookMessage(webhookProps));
+  console.log(body)
+  
+  axios.post(endpoint, body).catch((error) => {
+    console.error(`Failed to send webhook to ${endpoint}:`, error.message);
+  });
+});
 
-  // session webhook
-  const webhookSession = createWebhookSession(webhookProps);
+// Session webhook with per-user callbacks
+const sendSessionWebhook = (sessionName: string, status: "connected" | "connecting" | "disconnected") => {
+  const callbackUrl = getCallbackForSession(sessionName);
+  if (!callbackUrl) {
+    return;
+  }
 
-  whastapp.onConnected((session) => {
-    console.log(`session: '${session}' connected`);
-    webhookSession({ session, status: "connected" });
+  const endpoint = `${callbackUrl}/session`;
+  const body = {
+    session: sessionName,
+    status: status,
+  };
+  
+  axios.post(endpoint, body).catch((error) => {
+    console.error(`Failed to send session webhook to ${endpoint}:`, error.message);
   });
-  whastapp.onConnecting((session) => {
-    console.log(`session: '${session}' connecting`);
-    webhookSession({ session, status: "connecting" });
-  });
-  whastapp.onDisconnected((session) => {
-    console.log(`session: '${session}' disconnected`);
-    webhookSession({ session, status: "disconnected" });
-  });
+};
+
+whastapp.onConnected((session) => {
+  console.log(`session: '${session}' connected`);
+  sendSessionWebhook(session, "connected");
+});
+
+whastapp.onConnecting((session) => {
+  console.log(`session: '${session}' connecting`);
+  sendSessionWebhook(session, "connecting");
+});
+
+whastapp.onDisconnected((session) => {
+  console.log(`session: '${session}' disconnected`);
+  sendSessionWebhook(session, "disconnected");
+});
+
+// Legacy webhook support (if WEBHOOK_BASE_URL is set, also send to that endpoint)
+if (env.WEBHOOK_BASE_URL) {
+  console.log(`Legacy webhook enabled: ${env.WEBHOOK_BASE_URL}`);
 }
-// End Implement Webhook
+// End Implement Per-User Webhook
 
 whastapp.loadSessionsFromStorage();
