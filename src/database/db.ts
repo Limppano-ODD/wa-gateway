@@ -3,7 +3,7 @@ import path from "path";
 import bcrypt from "bcrypt";
 import { env } from "../env";
 
-const db = new Database(env.DB_PATH);
+const db: Database.Database = new Database(env.DB_PATH);
 
 // Create tables
 db.exec(`
