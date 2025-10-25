@@ -290,6 +290,9 @@ The gateway supports multiple authentication methods for webhooks, ensuring secu
 2. **Basic Auth** - Username and password authentication
 3. **Bearer Token** - Fixed bearer token authentication
 4. **OAuth2** - Full OAuth2 support with automatic token refresh
+   - Supports **Client Credentials** grant type
+   - Supports **Authorization Code** grant type
+   - Automatic token refresh when expired
 
 ### Configuring Webhook Authentication
 
@@ -371,6 +374,7 @@ When a webhook is sent:
 4. For **OAuth2**, it:
    - Checks if the current access token is valid (not expired)
    - If expired, automatically refreshes the token using the refresh token
+   - If refresh fails or no refresh token is available, sends the request with the existing token (the webhook endpoint will handle the authentication error)
    - Adds the access token as `Authorization: Bearer <access_token>` header
 5. The webhook request is sent with the appropriate authentication headers
 
