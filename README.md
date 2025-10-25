@@ -9,6 +9,7 @@ Easy Setup Headless multi session Whatsapp Gateway with NodeJS
 - **Session Isolation**: Each user has their own isolated sessions
 - **SQLite Database**: Secure credential storage with bcrypt hashing
 - **Web Dashboard**: User-friendly UI for session management and QR code generation
+- **Webhook Authentication**: Support for Basic Auth, Bearer Token, and OAuth2 authentication when sending webhooks
 
 ## Core Features
 
@@ -278,6 +279,113 @@ You can access media files using the following URL format:
 ```
 http://localhost:5001/media/3A5089C2F2652D46EBC5.jpg
 ```
+
+## 🔐 Webhook Authentication
+
+The gateway supports multiple authentication methods for webhooks, ensuring secure communication with your callback URLs.
+
+### Authentication Types
+
+1. **None** - No authentication (default)
+2. **Basic Auth** - Username and password authentication
+3. **Bearer Token** - Fixed bearer token authentication
+4. **OAuth2** - Full OAuth2 support with automatic token refresh
+
+### Configuring Webhook Authentication
+
+#### As a User (Dashboard API)
+
+**Get current webhook authentication configuration:**
+```bash
+curl -u username:password -X GET http://localhost:5001/dashboard/webhook-auth
+```
+
+**Configure Basic Authentication:**
+```bash
+curl -u username:password -X PUT http://localhost:5001/dashboard/webhook-auth \
+  -H "Content-Type: application/json" \
+  -d '{
+    "auth_type": "basic",
+    "auth_username": "webhook_user",
+    "auth_password": "webhook_password"
+  }'
+```
+
+**Configure Bearer Token:**
+```bash
+curl -u username:password -X PUT http://localhost:5001/dashboard/webhook-auth \
+  -H "Content-Type: application/json" \
+  -d '{
+    "auth_type": "bearer",
+    "auth_bearer_token": "your-bearer-token-here"
+  }'
+```
+
+**Configure OAuth2:**
+```bash
+curl -u username:password -X PUT http://localhost:5001/dashboard/webhook-auth \
+  -H "Content-Type: application/json" \
+  -d '{
+    "auth_type": "oauth2",
+    "oauth2_client_id": "your-client-id",
+    "oauth2_client_secret": "your-client-secret",
+    "oauth2_token_url": "https://oauth.example.com/token",
+    "oauth2_scope": "read write"
+  }'
+```
+
+**Request OAuth2 Token (Client Credentials):**
+```bash
+curl -u username:password -X POST http://localhost:5001/dashboard/webhook-auth/oauth2-client-credentials
+```
+
+**Request OAuth2 Token (Authorization Code):**
+```bash
+curl -u username:password -X POST http://localhost:5001/dashboard/webhook-auth/oauth2-token \
+  -H "Content-Type: application/json" \
+  -d '{
+    "code": "authorization-code-from-oauth-provider",
+    "redirect_uri": "https://your-app.com/callback"
+  }'
+```
+
+#### As an Admin
+
+Admins can configure webhook authentication for any user:
+
+```bash
+curl -u admin:admin -X PUT http://localhost:5001/admin/users/USER_ID/webhook-auth \
+  -H "Content-Type: application/json" \
+  -d '{
+    "auth_type": "bearer",
+    "auth_bearer_token": "user-bearer-token"
+  }'
+```
+
+### How It Works
+
+When a webhook is sent:
+1. The system retrieves the user's authentication configuration from the database
+2. For **Basic Auth**, it generates an `Authorization: Basic <base64>` header
+3. For **Bearer Token**, it adds an `Authorization: Bearer <token>` header
+4. For **OAuth2**, it:
+   - Checks if the current access token is valid (not expired)
+   - If expired, automatically refreshes the token using the refresh token
+   - Adds the access token as `Authorization: Bearer <access_token>` header
+5. The webhook request is sent with the appropriate authentication headers
+
+### OAuth2 Token Refresh
+
+OAuth2 tokens are automatically refreshed when:
+- The access token has expired
+- A webhook is about to be sent
+- The user has configured a refresh token
+
+The system stores:
+- Access token
+- Refresh token (if provided)
+- Token expiry time
+- OAuth2 configuration (client ID, client secret, token URL, scope)
 
 ## Upgrading
 
