@@ -109,12 +109,8 @@ import { User, userDb } from "./database/db";
 import axios from "axios";
 import { MessageReceived } from "wa-multi-session";
 import { messageStore } from "./utils/message-store";
+import { getAuthHeaders } from "./utils/webhook-auth";
 
-// Helper function to get callback URL for a session
-const getCallbackForSession = (sessionName: string): string | null => {
-  const user = userDb.getUserBySessionName(sessionName);
-  return user?.callback_url || null;
-};
 
 // Message webhook with per-user callbacks
 whastapp.onMessageReceived(async (message: MessageReceived) => {
@@ -124,13 +120,13 @@ whastapp.onMessageReceived(async (message: MessageReceived) => {
   if (message.key.fromMe || message.key.remoteJid?.includes("broadcast"))
     return;
 
-  const callbackUrl = getCallbackForSession(message.sessionId);
-  if (!callbackUrl) {
+  const user = userDb.getUserBySessionName(message.sessionId);
+  if (!user || !user.callback_url) {
     console.log(`No callback URL configured for session: ${message.sessionId}`);
     return;
   }
 
-  const endpoint = `${callbackUrl}`;
+  const endpoint = `${user.callback_url}`;
 
   
   const body = {
@@ -157,27 +153,43 @@ whastapp.onMessageReceived(async (message: MessageReceived) => {
 
   console.log(body)
   
-  axios.post(endpoint, body).catch((error) => {
-    console.error(`Failed to send webhook to ${endpoint}:`, error.message);
-  });
+  try {
+    const authHeaders = await getAuthHeaders(user);
+    await axios.post(endpoint, body, {
+      headers: {
+        "Content-Type": "application/json",
+        ...authHeaders,
+      },
+    });
+  } catch (error) {
+    console.error(`Failed to send webhook to ${endpoint}:`, error);
+  }
 });
 
 // Session webhook with per-user callbacks
-const sendSessionWebhook = (sessionName: string, status: "connected" | "connecting" | "disconnected") => {
-  const callbackUrl = getCallbackForSession(sessionName);
-  if (!callbackUrl) {
+const sendSessionWebhook = async (sessionName: string, status: "connected" | "connecting" | "disconnected") => {
+  const user = userDb.getUserBySessionName(sessionName);
+  if (!user || !user.callback_url) {
     return;
   }
 
-  const endpoint = `${callbackUrl}/session`;
+  const endpoint = `${user.callback_url}/session`;
   const body = {
     session: sessionName,
     status: status,
   };
   
-  axios.post(endpoint, body).catch((error) => {
-    console.error(`Failed to send session webhook to ${endpoint}:`, error.message);
-  });
+  try {
+    const authHeaders = await getAuthHeaders(user);
+    await axios.post(endpoint, body, {
+      headers: {
+        "Content-Type": "application/json",
+        ...authHeaders,
+      },
+    });
+  } catch (error) {
+    console.error(`Failed to send session webhook to ${endpoint}:`, error);
+  }
 };
 
 whastapp.onConnected((session) => {
