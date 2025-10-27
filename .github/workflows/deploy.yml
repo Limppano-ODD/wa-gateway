@@ -1,0 +1,197 @@
+name: Deploy Application
+on:
+  push:
+    branches:
+      - master
+      - hml
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to deploy'
+        required: true
+        default: 'hml'
+        type: choice
+        options:
+          - hml
+          - production
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+defaults:
+  run:
+    working-directory: /tmp
+
+jobs:
+  set-environment:
+    name: Determine Environment
+    runs-on: ubuntu-latest
+    outputs:
+      environment: ${{ steps.set-env.outputs.environment }}
+      runner: ${{ steps.set-env.outputs.runner }}
+    steps:
+      - name: Set environment based on trigger
+        id: set-env
+        run: |
+          if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
+            echo "environment=${{ github.event.inputs.environment }}" >> $GITHUB_OUTPUT
+            if [ "${{ github.event.inputs.environment }}" == "production" ]; then
+              echo "runner=dockerprod" >> $GITHUB_OUTPUT
+            else
+              echo "runner=dockerhml" >> $GITHUB_OUTPUT
+            fi
+          elif [ "${{ github.ref }}" == "refs/heads/main" ]; then
+            echo "environment=production" >> $GITHUB_OUTPUT
+            echo "runner=dockerprod" >> $GITHUB_OUTPUT
+          elif [ "${{ github.ref }}" == "refs/heads/hml" ]; then
+            echo "environment=hml" >> $GITHUB_OUTPUT
+            echo "runner=dockerhml" >> $GITHUB_OUTPUT
+          fi
+
+  deploy:
+    name: Deploy to ${{ needs.set-environment.outputs.environment }}
+    needs: set-environment
+    runs-on: ${{ needs.set-environment.outputs.runner }}
+    environment: ${{ needs.set-environment.outputs.environment }}
+    env:
+      PROJECT_DIR: /app/${{ github.event.repository.name }}
+      # PROJECT_DIR: /app/acordo_comercial
+      NEXTAUTH_SECRET: ${{ secrets.NEXTAUTH_SECRET }}
+      NODE_ENV: ${{ vars.NODE_ENV }}
+      NEXTAUTH_URL: ${{ vars.NEXTAUTH_URL }}
+      AZURE_AD_CLIENT_ID: ${{ secrets.AZURE_AD_CLIENT_ID }}
+      AZURE_AD_CLIENT_SECRET: ${{ secrets.AZURE_AD_CLIENT_SECRET }}
+      AZURE_AD_TENANT_ID: ${{ secrets.AZURE_AD_TENANT_ID }}
+      AUTHORITY: ${{ secrets.AUTHORITY }}
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      REDIRECT_PATH: ${{ secrets.REDIRECT_PATH }}
+      SCOPE: ${{ secrets.SCOPE }}
+      ENDPOINT: ${{ secrets.ENDPOINT }}
+      VENDEDORES_API_URL: ${{ vars.VENDEDORES_API_URL }}
+      VENDEDORES_API_USERNAME: ${{ secrets.VENDEDORES_API_USERNAME }}
+      VENDEDORES_API_PASSWORD: ${{ secrets.VENDEDORES_API_PASSWORD }}
+      VENDEDORES_API_EMAIL: ${{ secrets.VENDEDORES_API_EMAIL }}
+      AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      AWS_REGION: us-east-1
+      AWS_S3_BUCKET_NAME: ${{ vars.AWS_S3_BUCKET_NAME }}
+    steps:
+      - name: Debug - Show runner info BEFORE checkout
+        run: |
+          echo "=== RUNNER INFO BEFORE CHECKOUT ==="
+          echo "Current directory: $(pwd)"
+          echo "Home directory: $HOME"
+          echo "GitHub workspace: $GITHUB_WORKSPACE"
+          echo "Repository name: ${{ github.event.repository.name }}"
+          echo ""
+          echo "=== /app STRUCTURE ==="
+          ls -la /app/ 2>/dev/null || echo "/app not accessible"
+
+      - name: Ensure project directory exists and clean
+        run: |
+          echo "Ensuring directory exists: $PROJECT_DIR"
+          mkdir -p "$PROJECT_DIR"
+          echo "Cleaning directory: $PROJECT_DIR"
+          rm -rf "$PROJECT_DIR"/* "$PROJECT_DIR"/.git "$PROJECT_DIR"/.[!.]* 2>/dev/null || true
+          ls -la "$PROJECT_DIR"
+
+      - name: Checkout do código
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Copy code to project directory
+        run: |
+          echo "Copying code from $GITHUB_WORKSPACE to $PROJECT_DIR"
+          rsync -av --exclude='.git' "$GITHUB_WORKSPACE/" "$PROJECT_DIR/"
+          echo "Files copied successfully"
+          ls -la "$PROJECT_DIR" | head -20
+          
+      - name: Debug - After checkout
+        run: |
+          cd "$PROJECT_DIR"
+          echo "=== AFTER CHECKOUT ==="
+          echo "Current directory: $(pwd)"
+          echo "Git branch: $(git branch --show-current 2>/dev/null || echo 'detached HEAD')"
+          echo "Git commit: $(git rev-parse --short HEAD 2>/dev/null || echo 'no git')"
+          echo ""
+          echo "=== FILES IN CURRENT DIR ==="
+          ls -la | head -20
+          echo ""
+          echo "=== /app STRUCTURE (all projects) ==="
+          ls -la /app/
+          echo ""
+          echo "=== Checking if we're in the right place ==="
+          test -f package.json && echo "✅ package.json found" || echo "❌ package.json NOT found"
+          test -f docker-compose.yml && echo "✅ docker-compose.yml found" || echo "❌ docker-compose.yml NOT found"
+
+      - name: Check Docker access
+        run: docker info
+
+      - name: Debug - Print Environment Variables
+        run: |
+          echo "🔍 Verificando variáveis de ambiente..."
+          echo "NEXTAUTH_SECRET: ${NEXTAUTH_SECRET:+SET (hidden)}"
+          echo "NODE_ENV: $NODE_ENV"
+          echo "NEXTAUTH_URL: $NEXTAUTH_URL"
+          echo "AZURE_AD_CLIENT_ID: ${AZURE_AD_CLIENT_ID:0:10}..."
+          echo "AZURE_AD_CLIENT_SECRET: ${AZURE_AD_CLIENT_SECRET:+SET (hidden)}"
+          echo "AZURE_AD_TENANT_ID: ${AZURE_AD_TENANT_ID:0:10}..."
+          echo "DATABASE_URL: ${DATABASE_URL:+SET (hidden)}"
+          echo "VENDEDORES_API_URL: $VENDEDORES_API_URL"
+          echo "VENDEDORES_API_USERNAME: $VENDEDORES_API_USERNAME"
+          echo "VENDEDORES_API_EMAIL: $VENDEDORES_API_EMAIL"
+          echo "AWS_REGION: $AWS_REGION"
+          echo "AWS_S3_BUCKET_NAME: $AWS_S3_BUCKET_NAME"
+          echo "AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:0:10}..."
+          echo ""
+          echo "✅ Verificação de variáveis concluída"
+
+      - name: Fazer deploy via Docker Compose
+        id: deploy
+        run: |
+          cd "$PROJECT_DIR"
+          echo "Iniciando deploy ${{ needs.set-environment.outputs.environment }}"
+          echo "Diretório de trabalho: $(pwd)"
+          ls -la docker-compose.yml || echo "⚠️ docker-compose.yml não encontrado!"
+          docker compose up -d --build
+
+      - name: Health check após deploy
+        run: |
+          echo "Aguardando aplicação ${{ needs.set-environment.outputs.environment }} ficar saudável..."
+          for i in {1..30}; do
+            if curl -f -s http://localhost:3001/ > /dev/null; then
+              echo "✅ Aplicação ${{ needs.set-environment.outputs.environment }} está saudável"
+              break
+            fi
+            echo "⏳ Aguardando aplicação ${{ needs.set-environment.outputs.environment }} ficar saudável... ($i/30)"
+            sleep 10
+          done
+
+          if [ $i -eq 30 ]; then
+            echo "❌ Falha no health check após deploy ${{ needs.set-environment.outputs.environment }}"
+            echo "📊 Status dos containers:"
+            cd "$PROJECT_DIR"
+            docker compose ps
+            echo "📋 Logs do serviço ${{ github.event.repository.name }}:"
+            docker compose logs ${{ github.event.repository.name }} --tail=100
+            exit 1
+          fi
+
+      - name: Notificar sucesso do deploy
+        if: success()
+        run: |
+          cd "$PROJECT_DIR"
+          echo "✅ Deploy ${{ needs.set-environment.outputs.environment }} realizado com sucesso!"
+          echo "📊 Status final dos containers:"
+          docker compose ps
+
+      - name: Rollback em caso de falha
+        if: failure()
+        run: |
+          cd "$PROJECT_DIR"
+          echo "❌ Deploy ${{ needs.set-environment.outputs.environment }} falhou, iniciando rollback..."
+          echo "📋 Logs antes do rollback:"
+          docker compose logs ${{ github.event.repository.name }} --tail=50
+          docker compose down
+          docker compose up -d --no-build
+          echo "🔄 Rollback ${{ needs.set-environment.outputs.environment }} concluído"
