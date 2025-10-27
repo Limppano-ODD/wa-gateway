@@ -41,7 +41,7 @@ jobs:
             else
               echo "runner=dockerhml" >> $GITHUB_OUTPUT
             fi
-          elif [ "${{ github.ref }}" == "refs/heads/main" ]; then
+          elif [ "${{ github.ref }}" == "refs/heads/master" ]; then
             echo "environment=production" >> $GITHUB_OUTPUT
             echo "runner=dockerprod" >> $GITHUB_OUTPUT
           elif [ "${{ github.ref }}" == "refs/heads/hml" ]; then
