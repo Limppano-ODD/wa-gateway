@@ -159,7 +159,7 @@ jobs:
         run: |
           echo "Aguardando aplicação ${{ needs.set-environment.outputs.environment }} ficar saudável..."
           for i in {1..30}; do
-            if curl -f -s http://localhost:3001/ > /dev/null; then
+            if curl -f -s http://localhost:3002/ > /dev/null; then
               echo "✅ Aplicação ${{ needs.set-environment.outputs.environment }} está saudável"
               break
             fi
