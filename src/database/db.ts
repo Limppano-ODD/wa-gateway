@@ -18,22 +18,9 @@ db.exec(`
   );
 `);
 
-// Initialize admin user if not exists
-const initAdmin = () => {
-  const adminUser = db
-    .prepare("SELECT * FROM users WHERE username = ?")
-    .get(env.ADMIN_USER);
-
-  if (!adminUser) {
-    const hashedPassword = bcrypt.hashSync(env.ADMIN_PASSWORD, 10);
-    db.prepare(
-      "INSERT INTO users (username, password, is_admin) VALUES (?, ?, 1)"
-    ).run(env.ADMIN_USER, hashedPassword);
-    console.log("Admin user created");
-  }
-};
-
-initAdmin();
+// Note: Admin user is no longer created in the database.
+// Admin credentials are validated directly against environment variables (ADMIN_USER and ADMIN_PASSWORD)
+// and exist only as a virtual user for accessing the admin interface.
 
 export interface User {
   id: number;

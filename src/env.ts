@@ -10,8 +10,8 @@ export const env = z
       .default("5001")
       .transform((e) => Number(e)),
     WEBHOOK_BASE_URL: z.string().optional(),
-    ADMIN_USER: z.string().default("admin"),
-    ADMIN_PASSWORD: z.string().default("admin"),
+    ADMIN_USER: z.string(),
+    ADMIN_PASSWORD: z.string(),
     DB_PATH: z.string().default("./wa_gateway.db"),
   })
   .parse(process.env);

@@ -14,8 +14,8 @@ services:
       - PORT=3002
       - KEY=${KEY:-}
       - WEBHOOK_BASE_URL=${WEBHOOK_BASE_URL:-}
-      - ADMIN_USER=${ADMIN_USER:-admin}
-      - ADMIN_PASSWORD=${ADMIN_PASSWORD:-admin}
+      - ADMIN_USER=${ADMIN_USER}
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD}
       - DB_PATH=/app/db/wa_gateway.db
     
     volumes:
