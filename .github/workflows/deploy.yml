@@ -56,26 +56,12 @@ jobs:
     environment: ${{ needs.set-environment.outputs.environment }}
     env:
       PROJECT_DIR: /app/${{ github.event.repository.name }}
-      # PROJECT_DIR: /app/acordo_comercial
-      NEXTAUTH_SECRET: ${{ secrets.NEXTAUTH_SECRET }}
       NODE_ENV: ${{ vars.NODE_ENV }}
-      NEXTAUTH_URL: ${{ vars.NEXTAUTH_URL }}
-      AZURE_AD_CLIENT_ID: ${{ secrets.AZURE_AD_CLIENT_ID }}
-      AZURE_AD_CLIENT_SECRET: ${{ secrets.AZURE_AD_CLIENT_SECRET }}
-      AZURE_AD_TENANT_ID: ${{ secrets.AZURE_AD_TENANT_ID }}
-      AUTHORITY: ${{ secrets.AUTHORITY }}
-      DATABASE_URL: ${{ secrets.DATABASE_URL }}
-      REDIRECT_PATH: ${{ secrets.REDIRECT_PATH }}
-      SCOPE: ${{ secrets.SCOPE }}
-      ENDPOINT: ${{ secrets.ENDPOINT }}
-      VENDEDORES_API_URL: ${{ vars.VENDEDORES_API_URL }}
-      VENDEDORES_API_USERNAME: ${{ secrets.VENDEDORES_API_USERNAME }}
-      VENDEDORES_API_PASSWORD: ${{ secrets.VENDEDORES_API_PASSWORD }}
-      VENDEDORES_API_EMAIL: ${{ secrets.VENDEDORES_API_EMAIL }}
-      AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-      AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-      AWS_REGION: us-east-1
-      AWS_S3_BUCKET_NAME: ${{ vars.AWS_S3_BUCKET_NAME }}
+      WEBHOOK_BASE_URL: ${{ vars.WEBHOOK_BASE_URL }}
+      ADMIN_USER: ${{ vars.ADMIN_USER }}
+      ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD }}
+      DB_PATH: ${{ vars.DB_PATH }}
+      PORT: ${{ vars.PORT }}
     steps:
       - name: Debug - Show runner info BEFORE checkout
         run: |

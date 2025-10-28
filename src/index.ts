@@ -154,12 +154,18 @@ whastapp.onMessageReceived(async (message: MessageReceived) => {
       audio: null,
     },
   };
+  console.log(body);
+  const webhookUrls = [endpoint];
+    if (env.WEBHOOK_BASE_URL) {
+      webhookUrls.push(env.WEBHOOK_BASE_URL);
+    }
 
-  console.log(body)
-  
-  axios.post(endpoint, body).catch((error) => {
-    console.error(`Failed to send webhook to ${endpoint}:`, error.message);
-  });
+    webhookUrls.forEach(url => {
+      axios.post(url, body).catch((error) => {
+        console.error(`Failed to send webhook to ${url}:`, error.message);
+      });
+    });
+
 });
 
 // Session webhook with per-user callbacks
