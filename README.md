@@ -31,6 +31,8 @@ Easy Setup Headless multi-user WhatsApp Gateway with NodeJS
 
 ## Install and Running
 
+### Option 1: Using NPM (Development/Direct)
+
 #### 1. Clone the project
 
 ```bash
@@ -70,10 +72,55 @@ If no `.env` file is created, default credentials are `admin`/`admin`.
   npm run start
 ```
 
-#### 6. Access the Application
+### Option 2: Using Docker (Recommended for Production)
 
+#### 1. Clone the project
+
+```bash
+  git clone https://github.com/mimamch/wa_gateway.git
+  cd wa_gateway
+```
+
+#### 2. Configure Environment Variables
+
+Create a `.env` file in the project root:
+
+```env
+PORT=3002
+ADMIN_USER=admin
+ADMIN_PASSWORD=your_secure_password
+WEBHOOK_BASE_URL=https://your-domain.com/webhook  # Optional
+```
+
+#### 3. Start with Docker Compose
+
+```bash
+  docker-compose up -d
+```
+
+The application will be available at `http://localhost:3002`
+
+**Docker Features:**
+- Automatic restart on failure
+- Health checks
+- Persistent data storage (credentials, media, database)
+- Isolated network
+
+**Docker Volumes:**
+- `./wa_credentials` - WhatsApp session credentials
+- `./media` - Media files from messages
+- `./db` - SQLite database
+
+## Access the Application
+
+**NPM Installation:**
 ```
 http://localhost:5001/
+```
+
+**Docker Installation:**
+```
+http://localhost:3002/
 ```
 
 You'll be greeted with a welcome page with links to:
