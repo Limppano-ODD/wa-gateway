@@ -4,22 +4,22 @@ Easy Setup Headless multi-user WhatsApp Gateway with NodeJS
 
 ## 📑 Table of Contents
 
-- [New Features](#-new-features)
+- [New Features](#new-features)
 - [Core Features](#core-features)
-- [Requirements](#️-this-application-need-to-running-in-nodejs-v18-or-later-️)
+- [Requirements](#requirements)
 - [Install and Running](#install-and-running)
   - [NPM Installation](#option-1-using-npm-developmentdirect)
   - [Docker Installation](#option-2-using-docker-recommended-for-production)
 - [Access the Application](#access-the-application)
-- [User Types and Authentication](#-user-types-and-authentication)
-- [How to Use](#-how-to-use)
-- [Authentication](#-authentication)
-- [How to Send Messages](#-how-to-send-messages)
-- [Webhook Configuration](#-webhook-configuration)
+- [User Types and Authentication](#user-types-and-authentication)
+- [How to Use](#how-to-use)
+- [Authentication](#authentication)
+- [How to Send Messages](#how-to-send-messages)
+- [Webhook Configuration](#webhook-configuration)
 - [API Reference](#api-reference)
 - [Examples](#examples)
 - [Webhook Guide](#webhook-guide)
-- [Troubleshooting & FAQ](#-troubleshooting--faq)
+- [Troubleshooting & FAQ](#troubleshooting--faq)
 - [Upgrading](#upgrading)
 
 ## 🆕 New Features
@@ -45,9 +45,11 @@ Easy Setup Headless multi-user WhatsApp Gateway with NodeJS
 
 #### Read also [wa-multi-session](https://github.com/mimamch/wa-multi-session)
 
-### ⚠️ This application need to running in NodeJS v18 or later. ⚠️
+## Requirements
 
-#### Please Read [How to install NodeJS](https://nodejs.org/en/download/package-manager)
+⚠️ **This application needs to run on NodeJS v18 or later** ⚠️
+
+Please read [How to install NodeJS](https://nodejs.org/en/download/package-manager)
 
 ## Install and Running
 
@@ -82,7 +84,10 @@ ADMIN_PASSWORD=your_secure_password
 DB_PATH=./wa_gateway.db
 ```
 
-**Important**: Change the default admin credentials in production! The admin user is NOT stored in the database but validated against these environment variables.
+> **⚠️ SECURITY WARNING**  
+> **Change the default admin credentials in production!**  
+> The admin user is NOT stored in the database but validated against these environment variables.  
+> Using default credentials (`admin`/`admin`) in production is a security risk.
 
 If no `.env` file is created, default credentials are `admin`/`admin`.
 
@@ -784,8 +789,10 @@ A: Group IDs are sent to your webhook when you receive messages from a group. Th
 A: 
 1. Verify your callback URL is correct in the dashboard
 2. Make sure your webhook endpoint is publicly accessible
-3. Check your webhook server logs for incoming requests
-4. Ensure your webhook endpoint accepts POST requests with JSON body
+3. Ensure your webhook endpoint accepts POST requests with JSON body
+4. Verify your webhook returns HTTP 200 status code (required for continued delivery)
+5. Check your webhook server logs for incoming requests
+6. Test your webhook with a tool like webhook.site to verify it's reachable
 
 **Q: Can I use this with Docker?**
 
@@ -804,9 +811,13 @@ A: Run `npm install wa-multi-session@latest` and restart the server.
 
 ## Upgrading
 
-```
+To update the underlying WhatsApp library to the latest version:
+
+```bash
 npm install wa-multi-session@latest
 ```
+
+**Note**: This updates the `wa-multi-session` package, which is the core WhatsApp library used by this gateway application.
 
 ## Documentation
 
