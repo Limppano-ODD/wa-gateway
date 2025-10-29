@@ -73,6 +73,15 @@ try {
   // Column already exists, ignore
 }
 
+// For oauth: format type ('oauth2' for standard OAuth 2.0, 'json' for JSON username/password)
+try {
+  db.exec(`
+    ALTER TABLE users ADD COLUMN webhook_oauth_format TEXT DEFAULT 'oauth2';
+  `);
+} catch (e) {
+  // Column already exists, ignore
+}
+
 // Note: Admin user is no longer created in the database.
 // Admin credentials are validated directly against environment variables (ADMIN_USER and ADMIN_PASSWORD)
 // and exist only as a virtual user for accessing the admin interface.
@@ -90,6 +99,7 @@ export interface User {
   webhook_auth_token_url: string | null;
   webhook_auth_token: string | null;
   webhook_auth_token_expiration: string | null;
+  webhook_oauth_format: string | null;
   created_at: string;
 }
 
@@ -142,27 +152,12 @@ export const userDb = {
     return bcrypt.compareSync(password, hashedPassword);
   },
 
-  // Update user session name
-  updateUserSessionName(userId: number, sessionName: string): void {
-    db.prepare("UPDATE users SET session_name = ? WHERE id = ?").run(
-      sessionName,
-      userId
-    );
-  },
-
   // Update user callback URL
   updateUserCallbackUrl(userId: number, callbackUrl: string | null): void {
     db.prepare("UPDATE users SET callback_url = ? WHERE id = ?").run(
       callbackUrl,
       userId
     );
-  },
-
-  // Get user by session name
-  getUserBySessionName(sessionName: string): User | undefined {
-    return db
-      .prepare("SELECT * FROM users WHERE session_name = ?")
-      .get(sessionName) as User | undefined;
   },
 
   // Update user webhook authentication configuration
@@ -175,6 +170,7 @@ export const userDb = {
       webhook_auth_token_url?: string | null;
       webhook_auth_token?: string | null;
       webhook_auth_token_expiration?: string | null;
+      webhook_oauth_format?: string | null;
     }
   ): void {
     const updates: string[] = [];
@@ -203,6 +199,10 @@ export const userDb = {
     if (authConfig.webhook_auth_token_expiration !== undefined) {
       updates.push("webhook_auth_token_expiration = ?");
       values.push(authConfig.webhook_auth_token_expiration);
+    }
+    if (authConfig.webhook_oauth_format !== undefined) {
+      updates.push("webhook_oauth_format = ?");
+      values.push(authConfig.webhook_oauth_format);
     }
 
     if (updates.length > 0) {

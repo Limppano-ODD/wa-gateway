@@ -95,13 +95,13 @@ export const createAdminController = () => {
 
   // Update user session configuration
   const updateSessionConfigSchema = z.object({
-    session_name: z.string().optional(),
     callback_url: z.string().url().optional().nullable(),
     webhook_auth_type: z.enum(["none", "basic", "oauth", "bearer"]).optional(),
     webhook_auth_username: z.string().optional().nullable(),
     webhook_auth_password: z.string().optional().nullable(),
     webhook_auth_token_url: z.string().url().optional().nullable(),
     webhook_auth_token: z.string().optional().nullable(),
+    webhook_oauth_format: z.enum(["oauth2", "json"]).optional().nullable(),
   });
 
   app.put(
@@ -124,10 +124,6 @@ export const createAdminController = () => {
         });
       }
 
-      if (payload.session_name !== undefined) {
-        userDb.updateUserSessionName(userId, payload.session_name);
-      }
-
       if (payload.callback_url !== undefined) {
         userDb.updateUserCallbackUrl(userId, payload.callback_url);
       }
@@ -148,6 +144,9 @@ export const createAdminController = () => {
       }
       if (payload.webhook_auth_token !== undefined) {
         webhookAuthUpdates.webhook_auth_token = payload.webhook_auth_token;
+      }
+      if (payload.webhook_oauth_format !== undefined) {
+        webhookAuthUpdates.webhook_oauth_format = payload.webhook_oauth_format;
       }
 
       if (Object.keys(webhookAuthUpdates).length > 0) {

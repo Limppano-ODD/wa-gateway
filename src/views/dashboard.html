@@ -323,20 +323,30 @@
                 <!-- OAuth Fields -->
                 <div id="oauthFields" style="display: none;">
                     <div class="form-group">
-                        <label for="oauth_username">OAuth Client ID</label>
+                        <label for="webhook_oauth_format">OAuth Format</label>
+                        <select id="webhook_oauth_format" name="webhook_oauth_format">
+                            <option value="oauth2">Standard OAuth 2.0 (client_credentials)</option>
+                            <option value="json">JSON Login (username/password)</option>
+                        </select>
+                        <small style="color: #666; font-size: 12px;">
+                            Choose "Standard OAuth 2.0" for RFC-compliant OAuth endpoints, or "JSON Login" for custom login endpoints that expect username/password in JSON format
+                        </small>
+                    </div>
+                    <div class="form-group">
+                        <label for="oauth_username">OAuth Client ID / Username</label>
                         <input type="text" id="oauth_username" name="oauth_username" 
-                               placeholder="client_id">
+                               placeholder="client_id or username">
                     </div>
                     <div class="form-group">
-                        <label for="oauth_password">OAuth Client Secret</label>
+                        <label for="oauth_password">OAuth Client Secret / Password</label>
                         <input type="password" id="oauth_password" name="oauth_password" 
-                               placeholder="client_secret">
+                               placeholder="client_secret or password">
                     </div>
                     <div class="form-group">
-                        <label for="webhook_auth_token_url">OAuth Token URL</label>
+                        <label for="webhook_auth_token_url">Token/Login URL</label>
                         <input type="url" id="webhook_auth_token_url" name="webhook_auth_token_url" 
-                               placeholder="https://your-domain.com/oauth/token">
-                        <small style="color: #666; font-size: 12px;">The endpoint where OAuth tokens are obtained</small>
+                               placeholder="https://your-domain.com/oauth/token or /auth/login">
+                        <small style="color: #666; font-size: 12px;">The endpoint where tokens are obtained</small>
                     </div>
                 </div>
                 
@@ -383,6 +393,7 @@
                     document.getElementById('webhook_auth_username').value = data.data.webhook_auth_username || '';
                     document.getElementById('webhook_auth_token_url').value = data.data.webhook_auth_token_url || '';
                     document.getElementById('oauth_username').value = data.data.webhook_auth_username || '';
+                    document.getElementById('webhook_oauth_format').value = data.data.webhook_oauth_format || 'oauth2';
                     updateAuthFields(); // Show/hide appropriate fields
                     
                     const statusEl = document.getElementById('sessionStatus');
@@ -532,6 +543,7 @@
                 payload.webhook_auth_username = formData.get('oauth_username') || null;
                 payload.webhook_auth_password = formData.get('oauth_password') || null;
                 payload.webhook_auth_token_url = formData.get('webhook_auth_token_url') || null;
+                payload.webhook_oauth_format = formData.get('webhook_oauth_format') || 'oauth2';
             }
             
             try {

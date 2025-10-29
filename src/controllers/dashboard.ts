@@ -54,6 +54,7 @@ export const createDashboardController = () => {
     webhook_auth_password: z.string().nullable().optional(),
     webhook_auth_token_url: z.string().url().nullable().optional(),
     webhook_auth_token: z.string().nullable().optional(),
+    webhook_oauth_format: z.enum(["oauth2", "json"]).nullable().optional(),
   });
 
   app.put(
@@ -89,6 +90,9 @@ export const createDashboardController = () => {
       if (payload.webhook_auth_token !== undefined) {
         updates.webhook_auth_token = payload.webhook_auth_token;
       }
+      if (payload.webhook_oauth_format !== undefined) {
+        updates.webhook_oauth_format = payload.webhook_oauth_format;
+      }
 
       userDb.updateUserWebhookAuth(user.id, updates);
 
@@ -110,7 +114,7 @@ export const createDashboardController = () => {
       });
     }
 
-    const sessionName = user.session_name || user.username;
+    const sessionName = user.username;
     const session = whatsapp.getSession(sessionName);
     // Check if session exists AND is authenticated (has user info)
     const isConnected = !!(session?.user);
@@ -122,6 +126,7 @@ export const createDashboardController = () => {
         webhook_auth_type: user.webhook_auth_type || "none",
         webhook_auth_username: user.webhook_auth_username,
         webhook_auth_token_url: user.webhook_auth_token_url,
+        webhook_oauth_format: user.webhook_oauth_format || "oauth2",
         webhook_auth_configured: !!(user.webhook_auth_type && user.webhook_auth_type !== "none"),
         is_connected: isConnected,
       },
@@ -138,7 +143,7 @@ export const createDashboardController = () => {
       });
     }
 
-    const sessionName = user.session_name || user.username;
+    const sessionName = user.username;
 
     // Check if session already exists
     const existingSession = whatsapp.getSession(sessionName);
@@ -191,7 +196,7 @@ export const createDashboardController = () => {
       });
     }
 
-    const sessionName = user.session_name || user.username;
+    const sessionName = user.username;
     await whatsapp.deleteSession(sessionName);
 
     return c.json({

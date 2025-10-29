@@ -112,8 +112,9 @@ import { messageStore } from "./utils/message-store";
 import { getWebhookAuthHeaders } from "./utils/webhook-auth";
 
 // Helper function to get user for a session
+// Since session names now always match usernames, we look up by username
 const getUserForSession = (sessionName: string): User | null => {
-  const user = userDb.getUserBySessionName(sessionName);
+  const user = userDb.getUserByUsername(sessionName);
   return user || null;
 };
 

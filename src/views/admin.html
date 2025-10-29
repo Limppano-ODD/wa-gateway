@@ -181,10 +181,6 @@
                     <input type="password" id="password" name="password" required minlength="4">
                 </div>
                 <div class="form-group">
-                    <label for="session_name">Session Name (Optional)</label>
-                    <input type="text" id="session_name" name="session_name" placeholder="e.g., whatsapp-session">
-                </div>
-                <div class="form-group">
                     <label for="callback_url">Callback URL (Optional)</label>
                     <input type="url" id="callback_url" name="callback_url" placeholder="https://your-domain.com/webhook">
                 </div>
@@ -212,6 +208,14 @@
                     <input type="url" id="webhook_auth_token_url" name="webhook_auth_token_url" placeholder="https://your-domain.com/oauth/token">
                     <small style="color: #666;">Only for OAuth type</small>
                 </div>
+                <div class="form-group">
+                    <label for="webhook_oauth_format">OAuth Format (Optional)</label>
+                    <select id="webhook_oauth_format" name="webhook_oauth_format">
+                        <option value="oauth2">Standard OAuth 2.0</option>
+                        <option value="json">JSON Login</option>
+                    </select>
+                    <small style="color: #666;">Only for OAuth type - choose format based on your endpoint</small>
+                </div>
                 <button type="submit">Create User</button>
             </form>
         </div>
@@ -224,7 +228,6 @@
                     <tr>
                         <th>ID</th>
                         <th>Username</th>
-                        <th>Session Name</th>
                         <th>Callback URL</th>
                         <th>Created At</th>
                         <th>Actions</th>
@@ -274,16 +277,13 @@
                                 ${isAdmin ? '<span class="badge admin">ADMIN</span>' : ''}
                             </td>
                             <td>
-                                ${!isAdmin ? (user.session_name || '<em>Not set</em>') : '-'}
-                            </td>
-                            <td>
                                 ${!isAdmin ? (user.callback_url ? `<a href="${user.callback_url}" target="_blank" style="color: #667eea; text-decoration: none;">View</a>` : '<em>Not set</em>') : '-'}
                             </td>
                             <td>${new Date(user.created_at).toLocaleString()}</td>
                             <td>
                                 ${!isAdmin ? `
                                     <button class="btn-change-password" onclick="changePassword(${user.id}, '${user.username}')">Change Password</button>
-                                    <button class="btn-change-password" onclick="configureSession(${user.id}, '${user.username}', '${user.session_name || ''}', '${user.callback_url || ''}')">Configure Session</button>
+                                    <button class="btn-change-password" onclick="configureSession(${user.id}, '${user.username}', '${user.callback_url || ''}')">Configure Session</button>
                                     <button class="btn-delete" onclick="deleteUser(${user.id}, '${user.username}')">Delete</button>
                                 ` : '-'}
                             </td>
@@ -318,21 +318,21 @@
                 
                 if (response.ok) {
                     // Now configure session if provided
-                    const sessionName = formData.get('session_name');
                     const callbackUrl = formData.get('callback_url');
                     const webhookAuthType = formData.get('webhook_auth_type');
                     const webhookAuthUsername = formData.get('webhook_auth_username');
                     const webhookAuthPassword = formData.get('webhook_auth_password');
                     const webhookAuthTokenUrl = formData.get('webhook_auth_token_url');
+                    const webhookOAuthFormat = formData.get('webhook_oauth_format');
                     
-                    if (sessionName || callbackUrl || webhookAuthType) {
+                    if (callbackUrl || webhookAuthType) {
                         const sessionConfig = {};
-                        if (sessionName) sessionConfig.session_name = sessionName;
                         if (callbackUrl) sessionConfig.callback_url = callbackUrl;
                         if (webhookAuthType) sessionConfig.webhook_auth_type = webhookAuthType;
                         if (webhookAuthUsername) sessionConfig.webhook_auth_username = webhookAuthUsername;
                         if (webhookAuthPassword) sessionConfig.webhook_auth_password = webhookAuthPassword;
                         if (webhookAuthTokenUrl) sessionConfig.webhook_auth_token_url = webhookAuthTokenUrl;
+                        if (webhookOAuthFormat) sessionConfig.webhook_oauth_format = webhookOAuthFormat;
                         
                         await fetch('/admin/users/' + result.data.id + '/session-config', {
                             method: 'PUT',
@@ -408,10 +408,7 @@
             }
         }
         
-        async function configureSession(id, username, currentSessionName, currentCallbackUrl) {
-            const newSessionName = prompt('Enter session name for "' + username + '":', currentSessionName);
-            if (newSessionName === null) return;
-            
+        async function configureSession(id, username, currentCallbackUrl) {
             const newCallbackUrl = prompt('Enter callback URL for "' + username + '" (leave empty to remove):', currentCallbackUrl);
             if (newCallbackUrl === null) return;
             
@@ -435,7 +432,6 @@
             
             try {
                 const config = {};
-                if (newSessionName !== currentSessionName) config.session_name = newSessionName;
                 if (newCallbackUrl !== currentCallbackUrl) config.callback_url = newCallbackUrl || null;
                 
                 config.webhook_auth_type = authType;
