@@ -242,6 +242,10 @@
                     <span class="info-label">Callback URL:</span>
                     <span class="info-value" id="callbackUrl">Loading...</span>
                 </div>
+                <div class="info-row">
+                    <span class="info-label">OAuth Configured:</span>
+                    <span id="oauthStatus">Loading...</span>
+                </div>
             </div>
             
             <div id="qrcodeContainer" style="display: none;">
@@ -276,6 +280,32 @@
                 <button type="submit">💾 Update Callback URL</button>
             </form>
         </div>
+
+        <div class="card">
+            <h2>🔐 OAuth Configuration</h2>
+            <p style="color: #666; margin-bottom: 20px;">Configure OAuth credentials for authenticating webhook requests. The token will be automatically fetched and renewed when needed.</p>
+            <div id="oauthMessage"></div>
+            <form id="oauthForm">
+                <div class="form-group">
+                    <label for="oauth_login_input">OAuth Client ID / Login</label>
+                    <input type="text" id="oauth_login_input" name="oauth_login" 
+                           placeholder="client_id or username">
+                    <small style="color: #666; font-size: 12px;">Your OAuth client ID or username</small>
+                </div>
+                <div class="form-group">
+                    <label for="oauth_password_input">OAuth Client Secret / Password</label>
+                    <input type="password" id="oauth_password_input" name="oauth_password" 
+                           placeholder="client_secret or password">
+                    <small style="color: #666; font-size: 12px;">Your OAuth client secret or password</small>
+                </div>
+                <div style="background: #e3f2fd; padding: 15px; border-radius: 5px; margin-bottom: 20px;">
+                    <p style="margin: 0; color: #1976d2; font-size: 14px;">
+                        <strong>ℹ️ OAuth Token URL:</strong> The system will automatically fetch tokens from <code style="background: white; padding: 2px 6px; border-radius: 3px;">{callback_url_origin}/oauth/token</code>
+                    </p>
+                </div>
+                <button type="submit">💾 Update OAuth Configuration</button>
+            </form>
+        </div>
     </div>
     
     <script>
@@ -301,6 +331,16 @@
                     document.getElementById('sessionName').textContent = data.data.session_name;
                     document.getElementById('callbackUrl').textContent = data.data.callback_url || 'Not configured';
                     document.getElementById('callback_url_input').value = data.data.callback_url || '';
+                    
+                    // Update OAuth status
+                    const oauthStatusEl = document.getElementById('oauthStatus');
+                    if (data.data.oauth_configured) {
+                        oauthStatusEl.innerHTML = '<span class="status-badge connected">✓ Configured</span>';
+                    } else {
+                        oauthStatusEl.innerHTML = '<span class="status-badge disconnected">Not configured</span>';
+                    }
+                    // Populate OAuth fields if configured
+                    document.getElementById('oauth_login_input').value = data.data.oauth_login || '';
                     
                     const statusEl = document.getElementById('sessionStatus');
                     if (data.data.is_connected) {
@@ -417,6 +457,39 @@
                 }
             } catch (error) {
                 showMessage('callbackMessage', 'Error: ' + error.message, 'error');
+            }
+        });
+        
+        document.getElementById('oauthForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const formData = new FormData(e.target);
+            const oauthLogin = formData.get('oauth_login');
+            const oauthPassword = formData.get('oauth_password');
+            
+            try {
+                const response = await fetch('/dashboard/oauth', {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    credentials: 'include',
+                    body: JSON.stringify({
+                        oauth_login: oauthLogin || null,
+                        oauth_password: oauthPassword || null
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    showMessage('oauthMessage', 'OAuth configuration updated successfully!', 'success');
+                    loadSessionInfo();
+                } else {
+                    showMessage('oauthMessage', data.message || 'Failed to update OAuth configuration', 'error');
+                }
+            } catch (error) {
+                showMessage('oauthMessage', 'Error: ' + error.message, 'error');
             }
         });
         
