@@ -97,8 +97,11 @@ export const createAdminController = () => {
   const updateSessionConfigSchema = z.object({
     session_name: z.string().optional(),
     callback_url: z.string().url().optional().nullable(),
-    oauth_login: z.string().optional().nullable(),
-    oauth_password: z.string().optional().nullable(),
+    webhook_auth_type: z.enum(["none", "basic", "oauth", "bearer"]).optional(),
+    webhook_auth_username: z.string().optional().nullable(),
+    webhook_auth_password: z.string().optional().nullable(),
+    webhook_auth_token_url: z.string().url().optional().nullable(),
+    webhook_auth_token: z.string().optional().nullable(),
   });
 
   app.put(
@@ -129,11 +132,26 @@ export const createAdminController = () => {
         userDb.updateUserCallbackUrl(userId, payload.callback_url);
       }
 
-      if (payload.oauth_login !== undefined || payload.oauth_password !== undefined) {
-        userDb.updateUserOAuthConfig(userId, {
-          oauth_login: payload.oauth_login,
-          oauth_password: payload.oauth_password,
-        });
+      // Update webhook authentication configuration
+      const webhookAuthUpdates: any = {};
+      if (payload.webhook_auth_type !== undefined) {
+        webhookAuthUpdates.webhook_auth_type = payload.webhook_auth_type;
+      }
+      if (payload.webhook_auth_username !== undefined) {
+        webhookAuthUpdates.webhook_auth_username = payload.webhook_auth_username;
+      }
+      if (payload.webhook_auth_password !== undefined) {
+        webhookAuthUpdates.webhook_auth_password = payload.webhook_auth_password;
+      }
+      if (payload.webhook_auth_token_url !== undefined) {
+        webhookAuthUpdates.webhook_auth_token_url = payload.webhook_auth_token_url;
+      }
+      if (payload.webhook_auth_token !== undefined) {
+        webhookAuthUpdates.webhook_auth_token = payload.webhook_auth_token;
+      }
+
+      if (Object.keys(webhookAuthUpdates).length > 0) {
+        userDb.updateUserWebhookAuth(userId, webhookAuthUpdates);
       }
 
       return c.json({

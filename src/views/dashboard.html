@@ -243,7 +243,7 @@
                     <span class="info-value" id="callbackUrl">Loading...</span>
                 </div>
                 <div class="info-row">
-                    <span class="info-label">OAuth Configured:</span>
+                    <span class="info-label">Webhook Auth:</span>
                     <span id="oauthStatus">Loading...</span>
                 </div>
             </div>
@@ -282,28 +282,65 @@
         </div>
 
         <div class="card">
-            <h2>🔐 OAuth Configuration</h2>
-            <p style="color: #666; margin-bottom: 20px;">Configure OAuth credentials for authenticating webhook requests. The token will be automatically fetched and renewed when needed.</p>
-            <div id="oauthMessage"></div>
-            <form id="oauthForm">
+            <h2>🔐 Webhook Authentication</h2>
+            <p style="color: #666; margin-bottom: 20px;">Configure authentication for webhook requests. Choose the authentication type that matches your webhook endpoint.</p>
+            <div id="webhookAuthMessage"></div>
+            <form id="webhookAuthForm">
                 <div class="form-group">
-                    <label for="oauth_login_input">OAuth Client ID / Login</label>
-                    <input type="text" id="oauth_login_input" name="oauth_login" 
-                           placeholder="client_id or username">
-                    <small style="color: #666; font-size: 12px;">Your OAuth client ID or username</small>
+                    <label for="webhook_auth_type">Authentication Type</label>
+                    <select id="webhook_auth_type" name="webhook_auth_type" onchange="updateAuthFields()">
+                        <option value="none">None (No Authentication)</option>
+                        <option value="basic">Basic Authentication</option>
+                        <option value="bearer">Bearer Token (Static)</option>
+                        <option value="oauth">OAuth 2.0 (Client Credentials)</option>
+                    </select>
                 </div>
-                <div class="form-group">
-                    <label for="oauth_password_input">OAuth Client Secret / Password</label>
-                    <input type="password" id="oauth_password_input" name="oauth_password" 
-                           placeholder="client_secret or password">
-                    <small style="color: #666; font-size: 12px;">Your OAuth client secret or password</small>
+                
+                <!-- Basic Auth Fields -->
+                <div id="basicAuthFields" style="display: none;">
+                    <div class="form-group">
+                        <label for="webhook_auth_username">Username</label>
+                        <input type="text" id="webhook_auth_username" name="webhook_auth_username" 
+                               placeholder="username">
+                    </div>
+                    <div class="form-group">
+                        <label for="webhook_auth_password">Password</label>
+                        <input type="password" id="webhook_auth_password" name="webhook_auth_password" 
+                               placeholder="password">
+                    </div>
                 </div>
-                <div style="background: #e3f2fd; padding: 15px; border-radius: 5px; margin-bottom: 20px;">
-                    <p style="margin: 0; color: #1976d2; font-size: 14px;">
-                        <strong>ℹ️ OAuth Token URL:</strong> The system will automatically fetch tokens from <code style="background: white; padding: 2px 6px; border-radius: 3px;">{callback_url_origin}/oauth/token</code>
-                    </p>
+                
+                <!-- Bearer Token Fields -->
+                <div id="bearerTokenFields" style="display: none;">
+                    <div class="form-group">
+                        <label for="webhook_auth_token">Bearer Token</label>
+                        <input type="text" id="webhook_auth_token" name="webhook_auth_token" 
+                               placeholder="your_static_token_here">
+                        <small style="color: #666; font-size: 12px;">Provide the static bearer token for your webhook</small>
+                    </div>
                 </div>
-                <button type="submit">💾 Update OAuth Configuration</button>
+                
+                <!-- OAuth Fields -->
+                <div id="oauthFields" style="display: none;">
+                    <div class="form-group">
+                        <label for="oauth_username">OAuth Client ID</label>
+                        <input type="text" id="oauth_username" name="oauth_username" 
+                               placeholder="client_id">
+                    </div>
+                    <div class="form-group">
+                        <label for="oauth_password">OAuth Client Secret</label>
+                        <input type="password" id="oauth_password" name="oauth_password" 
+                               placeholder="client_secret">
+                    </div>
+                    <div class="form-group">
+                        <label for="webhook_auth_token_url">OAuth Token URL</label>
+                        <input type="url" id="webhook_auth_token_url" name="webhook_auth_token_url" 
+                               placeholder="https://your-domain.com/oauth/token">
+                        <small style="color: #666; font-size: 12px;">The endpoint where OAuth tokens are obtained</small>
+                    </div>
+                </div>
+                
+                <button type="submit">💾 Update Webhook Authentication</button>
             </form>
         </div>
     </div>
@@ -332,15 +369,21 @@
                     document.getElementById('callbackUrl').textContent = data.data.callback_url || 'Not configured';
                     document.getElementById('callback_url_input').value = data.data.callback_url || '';
                     
-                    // Update OAuth status
-                    const oauthStatusEl = document.getElementById('oauthStatus');
-                    if (data.data.oauth_configured) {
-                        oauthStatusEl.innerHTML = '<span class="status-badge connected">✓ Configured</span>';
+                    // Update webhook auth status
+                    const webhookAuthStatusEl = document.getElementById('oauthStatus');
+                    if (data.data.webhook_auth_configured) {
+                        webhookAuthStatusEl.innerHTML = '<span class="status-badge connected">✓ ' + (data.data.webhook_auth_type || 'none').toUpperCase() + '</span>';
                     } else {
-                        oauthStatusEl.innerHTML = '<span class="status-badge disconnected">Not configured</span>';
+                        webhookAuthStatusEl.innerHTML = '<span class="status-badge disconnected">Not configured</span>';
                     }
-                    // Populate OAuth fields if configured
-                    document.getElementById('oauth_login_input').value = data.data.oauth_login || '';
+                    
+                    // Populate webhook auth fields
+                    const authType = data.data.webhook_auth_type || 'none';
+                    document.getElementById('webhook_auth_type').value = authType;
+                    document.getElementById('webhook_auth_username').value = data.data.webhook_auth_username || '';
+                    document.getElementById('webhook_auth_token_url').value = data.data.webhook_auth_token_url || '';
+                    document.getElementById('oauth_username').value = data.data.webhook_auth_username || '';
+                    updateAuthFields(); // Show/hide appropriate fields
                     
                     const statusEl = document.getElementById('sessionStatus');
                     if (data.data.is_connected) {
@@ -460,36 +503,57 @@
             }
         });
         
-        document.getElementById('oauthForm').addEventListener('submit', async (e) => {
+        // Function to show/hide auth fields based on selected type
+        function updateAuthFields() {
+            const authType = document.getElementById('webhook_auth_type').value;
+            
+            document.getElementById('basicAuthFields').style.display = authType === 'basic' ? 'block' : 'none';
+            document.getElementById('bearerTokenFields').style.display = authType === 'bearer' ? 'block' : 'none';
+            document.getElementById('oauthFields').style.display = authType === 'oauth' ? 'block' : 'none';
+        }
+        
+        document.getElementById('webhookAuthForm').addEventListener('submit', async (e) => {
             e.preventDefault();
             
             const formData = new FormData(e.target);
-            const oauthLogin = formData.get('oauth_login');
-            const oauthPassword = formData.get('oauth_password');
+            const authType = formData.get('webhook_auth_type');
+            
+            const payload = {
+                webhook_auth_type: authType
+            };
+            
+            // Add fields based on auth type
+            if (authType === 'basic') {
+                payload.webhook_auth_username = formData.get('webhook_auth_username') || null;
+                payload.webhook_auth_password = formData.get('webhook_auth_password') || null;
+            } else if (authType === 'bearer') {
+                payload.webhook_auth_token = formData.get('webhook_auth_token') || null;
+            } else if (authType === 'oauth') {
+                payload.webhook_auth_username = formData.get('oauth_username') || null;
+                payload.webhook_auth_password = formData.get('oauth_password') || null;
+                payload.webhook_auth_token_url = formData.get('webhook_auth_token_url') || null;
+            }
             
             try {
-                const response = await fetch('/dashboard/oauth', {
+                const response = await fetch('/dashboard/webhook-auth', {
                     method: 'PUT',
                     headers: {
                         'Content-Type': 'application/json'
                     },
                     credentials: 'include',
-                    body: JSON.stringify({
-                        oauth_login: oauthLogin || null,
-                        oauth_password: oauthPassword || null
-                    })
+                    body: JSON.stringify(payload)
                 });
                 
                 const data = await response.json();
                 
                 if (response.ok) {
-                    showMessage('oauthMessage', 'OAuth configuration updated successfully!', 'success');
+                    showMessage('webhookAuthMessage', 'Webhook authentication updated successfully!', 'success');
                     loadSessionInfo();
                 } else {
-                    showMessage('oauthMessage', data.message || 'Failed to update OAuth configuration', 'error');
+                    showMessage('webhookAuthMessage', data.message || 'Failed to update webhook authentication', 'error');
                 }
             } catch (error) {
-                showMessage('oauthMessage', 'Error: ' + error.message, 'error');
+                showMessage('webhookAuthMessage', 'Error: ' + error.message, 'error');
             }
         });
         

@@ -109,7 +109,7 @@ import { User, userDb } from "./database/db";
 import axios from "axios";
 import { MessageReceived } from "wa-multi-session";
 import { messageStore } from "./utils/message-store";
-import { getValidOAuthToken, getOAuthTokenUrl } from "./utils/oauth";
+import { getWebhookAuthHeaders } from "./utils/webhook-auth";
 
 // Helper function to get user for a session
 const getUserForSession = (sessionName: string): User | null => {
@@ -117,7 +117,7 @@ const getUserForSession = (sessionName: string): User | null => {
   return user || null;
 };
 
-// Helper function to send webhook with OAuth support
+// Helper function to send webhook with authentication support
 async function sendWebhookWithAuth(
   url: string,
   body: any,
@@ -128,15 +128,11 @@ async function sendWebhookWithAuth(
       "Content-Type": "application/json",
     };
 
-    // Add OAuth token if configured
-    if (user?.oauth_login && user?.oauth_password) {
-      const tokenUrl = getOAuthTokenUrl(url);
-      const token = await getValidOAuthToken(user, tokenUrl);
-      if (token) {
-        headers["Authorization"] = `Bearer ${token}`;
-      }
-    }
+    // Add authentication headers based on user's webhook auth configuration
+    const authHeaders = await getWebhookAuthHeaders(user);
+    Object.assign(headers, authHeaders);
 
+    // Send to webhook URL exactly as configured (no modifications)
     await axios.post(url, body, { headers });
   } catch (error) {
     if (axios.isAxiosError(error)) {

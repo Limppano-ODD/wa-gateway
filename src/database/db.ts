@@ -18,34 +18,56 @@ db.exec(`
   );
 `);
 
-// Add OAuth columns if they don't exist (migration)
+// Add webhook authentication columns if they don't exist (migration)
+// webhook_auth_type: 'none', 'basic', 'oauth', 'bearer'
 try {
   db.exec(`
-    ALTER TABLE users ADD COLUMN oauth_login TEXT;
+    ALTER TABLE users ADD COLUMN webhook_auth_type TEXT DEFAULT 'none';
   `);
 } catch (e) {
   // Column already exists, ignore
 }
 
+// For basic/oauth: username or client_id
 try {
   db.exec(`
-    ALTER TABLE users ADD COLUMN oauth_password TEXT;
+    ALTER TABLE users ADD COLUMN webhook_auth_username TEXT;
   `);
 } catch (e) {
   // Column already exists, ignore
 }
 
+// For basic/oauth: password or client_secret
 try {
   db.exec(`
-    ALTER TABLE users ADD COLUMN oauth_token TEXT;
+    ALTER TABLE users ADD COLUMN webhook_auth_password TEXT;
   `);
 } catch (e) {
   // Column already exists, ignore
 }
 
+// For oauth: token endpoint URL
 try {
   db.exec(`
-    ALTER TABLE users ADD COLUMN oauth_token_expiration DATETIME;
+    ALTER TABLE users ADD COLUMN webhook_auth_token_url TEXT;
+  `);
+} catch (e) {
+  // Column already exists, ignore
+}
+
+// For oauth/bearer: cached token
+try {
+  db.exec(`
+    ALTER TABLE users ADD COLUMN webhook_auth_token TEXT;
+  `);
+} catch (e) {
+  // Column already exists, ignore
+}
+
+// For oauth: token expiration
+try {
+  db.exec(`
+    ALTER TABLE users ADD COLUMN webhook_auth_token_expiration DATETIME;
   `);
 } catch (e) {
   // Column already exists, ignore
@@ -62,10 +84,12 @@ export interface User {
   is_admin: number;
   session_name: string | null;
   callback_url: string | null;
-  oauth_login: string | null;
-  oauth_password: string | null;
-  oauth_token: string | null;
-  oauth_token_expiration: string | null;
+  webhook_auth_type: string | null;
+  webhook_auth_username: string | null;
+  webhook_auth_password: string | null;
+  webhook_auth_token_url: string | null;
+  webhook_auth_token: string | null;
+  webhook_auth_token_expiration: string | null;
   created_at: string;
 }
 
@@ -141,34 +165,44 @@ export const userDb = {
       .get(sessionName) as User | undefined;
   },
 
-  // Update user OAuth configuration
-  updateUserOAuthConfig(
-    userId: number, 
-    oauthConfig: {
-      oauth_login?: string | null;
-      oauth_password?: string | null;
-      oauth_token?: string | null;
-      oauth_token_expiration?: string | null;
+  // Update user webhook authentication configuration
+  updateUserWebhookAuth(
+    userId: number,
+    authConfig: {
+      webhook_auth_type?: string | null;
+      webhook_auth_username?: string | null;
+      webhook_auth_password?: string | null;
+      webhook_auth_token_url?: string | null;
+      webhook_auth_token?: string | null;
+      webhook_auth_token_expiration?: string | null;
     }
   ): void {
     const updates: string[] = [];
     const values: any[] = [];
 
-    if (oauthConfig.oauth_login !== undefined) {
-      updates.push("oauth_login = ?");
-      values.push(oauthConfig.oauth_login);
+    if (authConfig.webhook_auth_type !== undefined) {
+      updates.push("webhook_auth_type = ?");
+      values.push(authConfig.webhook_auth_type);
     }
-    if (oauthConfig.oauth_password !== undefined) {
-      updates.push("oauth_password = ?");
-      values.push(oauthConfig.oauth_password);
+    if (authConfig.webhook_auth_username !== undefined) {
+      updates.push("webhook_auth_username = ?");
+      values.push(authConfig.webhook_auth_username);
     }
-    if (oauthConfig.oauth_token !== undefined) {
-      updates.push("oauth_token = ?");
-      values.push(oauthConfig.oauth_token);
+    if (authConfig.webhook_auth_password !== undefined) {
+      updates.push("webhook_auth_password = ?");
+      values.push(authConfig.webhook_auth_password);
     }
-    if (oauthConfig.oauth_token_expiration !== undefined) {
-      updates.push("oauth_token_expiration = ?");
-      values.push(oauthConfig.oauth_token_expiration);
+    if (authConfig.webhook_auth_token_url !== undefined) {
+      updates.push("webhook_auth_token_url = ?");
+      values.push(authConfig.webhook_auth_token_url);
+    }
+    if (authConfig.webhook_auth_token !== undefined) {
+      updates.push("webhook_auth_token = ?");
+      values.push(authConfig.webhook_auth_token);
+    }
+    if (authConfig.webhook_auth_token_expiration !== undefined) {
+      updates.push("webhook_auth_token_expiration = ?");
+      values.push(authConfig.webhook_auth_token_expiration);
     }
 
     if (updates.length > 0) {

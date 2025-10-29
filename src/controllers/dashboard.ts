@@ -47,36 +47,54 @@ export const createDashboardController = () => {
     }
   );
 
-  // Update OAuth configuration for current user
-  const updateOAuthSchema = z.object({
-    oauth_login: z.string().nullable(),
-    oauth_password: z.string().nullable(),
+  // Update webhook authentication configuration for current user
+  const updateWebhookAuthSchema = z.object({
+    webhook_auth_type: z.enum(["none", "basic", "oauth", "bearer"]),
+    webhook_auth_username: z.string().nullable().optional(),
+    webhook_auth_password: z.string().nullable().optional(),
+    webhook_auth_token_url: z.string().url().nullable().optional(),
+    webhook_auth_token: z.string().nullable().optional(),
   });
 
   app.put(
-    "/oauth",
-    requestValidator("json", updateOAuthSchema),
+    "/webhook-auth",
+    requestValidator("json", updateWebhookAuthSchema),
     async (c) => {
       const user = c.get("user") as User;
       const payload = c.req.valid("json");
 
       if (user.is_admin === 1) {
         throw new HTTPException(400, {
-          message: "Admin users cannot configure OAuth",
+          message: "Admin users cannot configure webhook authentication",
         });
       }
 
-      userDb.updateUserOAuthConfig(user.id, {
-        oauth_login: payload.oauth_login,
-        oauth_password: payload.oauth_password,
-        // Reset token when credentials change
-        oauth_token: null,
-        oauth_token_expiration: null,
-      });
+      const updates: any = {
+        webhook_auth_type: payload.webhook_auth_type,
+      };
+
+      // Reset token when changing auth type or credentials
+      updates.webhook_auth_token = null;
+      updates.webhook_auth_token_expiration = null;
+
+      if (payload.webhook_auth_username !== undefined) {
+        updates.webhook_auth_username = payload.webhook_auth_username;
+      }
+      if (payload.webhook_auth_password !== undefined) {
+        updates.webhook_auth_password = payload.webhook_auth_password;
+      }
+      if (payload.webhook_auth_token_url !== undefined) {
+        updates.webhook_auth_token_url = payload.webhook_auth_token_url;
+      }
+      if (payload.webhook_auth_token !== undefined) {
+        updates.webhook_auth_token = payload.webhook_auth_token;
+      }
+
+      userDb.updateUserWebhookAuth(user.id, updates);
 
       return c.json({
         data: {
-          message: "OAuth configuration updated successfully",
+          message: "Webhook authentication configuration updated successfully",
         },
       });
     }
@@ -101,8 +119,10 @@ export const createDashboardController = () => {
       data: {
         session_name: sessionName,
         callback_url: user.callback_url,
-        oauth_login: user.oauth_login,
-        oauth_configured: !!(user.oauth_login && user.oauth_password),
+        webhook_auth_type: user.webhook_auth_type || "none",
+        webhook_auth_username: user.webhook_auth_username,
+        webhook_auth_token_url: user.webhook_auth_token_url,
+        webhook_auth_configured: !!(user.webhook_auth_type && user.webhook_auth_type !== "none"),
         is_connected: isConnected,
       },
     });
