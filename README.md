@@ -1,22 +1,27 @@
-# Headless Multi Session Whatsapp Gateway NodeJS
+# Headless Multi-User WhatsApp Gateway with NodeJS
 
-Easy Setup Headless multi session Whatsapp Gateway with NodeJS
+Easy Setup Headless multi-user WhatsApp Gateway with NodeJS
 
 ## 🆕 New Features
 
 - **Multi-user Support**: Multiple users with individual authentication
 - **User Management**: Admin panel for creating and managing users
-- **Session Isolation**: Each user has their own isolated sessions
+- **Single Session Per User**: Each regular user has their own isolated WhatsApp session
 - **SQLite Database**: Secure credential storage with bcrypt hashing
 - **Web Dashboard**: User-friendly UI for session management and QR code generation
+- **Per-User Webhooks**: Configure individual webhook URLs for each user
+- **Reply/Quote Messages**: Send messages as replies to previous messages
 
 ## Core Features
 
-- Support Multi device
-- Support Multi Session / Multi Phone Number
+- Support Multi Device
+- Support Multi User (Each user manages one WhatsApp session)
+- Admin can manage multiple sessions
 - Send Text Message
 - Send Image
 - Send Document
+- Send Sticker
+- Reply to Messages
 
 #### Read also [wa-multi-session](https://github.com/mimamch/wa-multi-session)
 
@@ -44,17 +49,20 @@ Easy Setup Headless multi session Whatsapp Gateway with NodeJS
   npm install
 ```
 
-#### 4. Configure Environment (Optional)
+#### 4. Configure Environment Variables
 
-Create a `.env` file to set admin credentials:
+Create a `.env` file to set admin credentials and other configurations:
 
 ```env
 PORT=5001
 ADMIN_USER=admin
 ADMIN_PASSWORD=your_secure_password
+DB_PATH=./wa_gateway.db
 ```
 
-Default credentials are `admin`/`admin` if not configured.
+**Important**: Change the default admin credentials in production! The admin user is NOT stored in the database but validated against these environment variables.
+
+If no `.env` file is created, default credentials are `admin`/`admin`.
 
 #### 5. Start the server
 
@@ -69,44 +77,151 @@ http://localhost:5001/
 ```
 
 You'll be greeted with a welcome page with links to:
-- **Dashboard**: Manage your sessions and generate QR codes
-- **Admin Panel**: Create and manage users (admin only)
+- **Dashboard** (`/dashboard`): For regular users to manage their WhatsApp session and generate QR codes
+- **Admin Panel** (`/admin`): For admin to create and manage users (requires admin credentials)
 
-#### 7. Using the Dashboard
+## 👥 User Types and Authentication
 
-Login with your credentials and create a new session. The system will:
-1. Generate a QR code
-2. Display it in the browser
-3. Wait for you to scan it with WhatsApp
-4. Automatically connect once scanned
+### Admin User
+- Credentials are set via environment variables (`ADMIN_USER` and `ADMIN_PASSWORD`)
+- **NOT stored in the database** - exists only for admin interface access
+- Can create and manage regular users
+- Can create multiple WhatsApp sessions with custom names
+- Cannot configure webhooks (admin is for management only)
+
+### Regular Users
+- Created by admin through the admin panel
+- Credentials stored securely in SQLite database with bcrypt hashing
+- Each user has **ONE WhatsApp session** (using their username or configured session name)
+- Can configure their own webhook callback URL
+- Access their session via the dashboard
+
+## 📱 How to Use
+
+### For Admin - Creating Users
+
+1. Login to `/admin` with admin credentials (from `.env`)
+2. Click "Create New User"
+3. Enter username and password for the new user
+4. Optionally configure a custom session name and webhook URL
+5. The user can now login to `/dashboard` with their credentials
+
+### For Regular Users - Connecting WhatsApp
+
+1. Login to `/dashboard` with your user credentials
+2. Click "Generate QR Code"
+3. The system will:
+   - Generate a QR code for your session
+   - Display it in the browser
+   - Wait for you to scan it with WhatsApp
+4. Open WhatsApp on your phone
+5. Go to Settings → Linked Devices → Link a Device
+6. Scan the QR code displayed
+7. Once scanned, your session is connected and ready to send messages!
 
 ## 🔐 Authentication
 
-All endpoints now require HTTP Basic Authentication. See [USER_MANAGEMENT.md](./USER_MANAGEMENT.md) for detailed documentation.
+All API endpoints require HTTP Basic Authentication using your username and password.
 
-### Quick Start with Authentication
+### Authentication Types
+
+**Admin Authentication:**
+- Username/password from environment variables
+- Use for admin operations and creating multiple sessions
+- Cannot configure webhooks
+
+**Regular User Authentication:**
+- Username/password created by admin
+- Each user has ONE session (using username or configured session_name)
+- Can configure personal webhook URL
+
+### How to Authenticate
+
+Include credentials in requests using HTTP Basic Auth:
 
 ```bash
-# Create a session (as admin)
-curl -u admin:admin -X POST http://localhost:5001/session/start \
-  -H "Content-Type: application/json" \
-  -d '{"session": "mysession"}'
+# Using curl with -u flag
+curl -u username:password http://localhost:5001/endpoint
 
-# Send a message
-curl -u admin:admin -X POST http://localhost:5001/message/send-text \
+# Or using Authorization header
+curl -H "Authorization: Basic $(echo -n 'username:password' | base64)" http://localhost:5001/endpoint
+```
+
+## 📨 How to Send Messages
+
+### For Regular Users
+
+Regular users send messages using **their single session** (their username or configured session name):
+
+```bash
+# Send a text message
+curl -u myuser:mypassword -X POST http://localhost:5001/message/send-text \
   -H "Content-Type: application/json" \
   -d '{
-    "session": "mysession",
+    "session": "myuser",
     "to": "628123456789",
     "text": "Hello World"
   }'
 ```
 
+### For Admin Users
+
+Admin can send messages using any session they've created:
+
+```bash
+# Admin creating and using a custom session
+curl -u admin:admin -X POST http://localhost:5001/session/start \
+  -H "Content-Type: application/json" \
+  -d '{"session": "sales_team"}'
+
+# Admin sending a message with that session
+curl -u admin:admin -X POST http://localhost:5001/message/send-text \
+  -H "Content-Type: application/json" \
+  -d '{
+    "session": "sales_team",
+    "to": "628123456789",
+    "text": "Hello from sales team"
+  }'
+```
+
+### Session Naming Convention
+
+- **Regular users**: Use their username (e.g., `"session": "john"`) or configured session_name
+- **Admin**: Can use any custom session name (e.g., `"session": "sales_team"`, `"session": "support"`)
+
+## 🔗 Webhook Configuration
+
+### Per-User Webhooks
+
+Each regular user can configure their own webhook URL to receive messages and session updates:
+
+**Via Dashboard:**
+1. Login to `/dashboard`
+2. Enter your webhook URL in the configuration
+3. Click "Save"
+
+**Via API:**
+```bash
+curl -u myuser:mypassword -X PUT http://localhost:5001/dashboard/callback \
+  -H "Content-Type: application/json" \
+  -d '{"callback_url": "https://your-domain.com/webhook"}'
+```
+
+### Legacy Global Webhook
+
+You can still set a global webhook URL via environment variable that receives all events:
+
+```env
+WEBHOOK_BASE_URL=https://your-domain.com/webhook
+```
+
+Both per-user and global webhooks will receive events if configured.
+
 ## API Reference
 
 **Note**: All API endpoints require HTTP Basic Authentication.
 
-#### Authentication
+### Authentication Header
 
 All requests must include HTTP Basic Auth credentials:
 
@@ -117,154 +232,388 @@ curl -u username:password http://localhost:5001/endpoint
 Or using Authorization header:
 
 ```bash
-curl -H "Authorization: Basic base64(username:password)" http://localhost:5001/endpoint
+curl -H "Authorization: Basic $(echo -n 'username:password' | base64)" http://localhost:5001/endpoint
 ```
 
-#### Add new session
+### Session Management
 
-```
-  GET /session/start?session=NEW_SESSION_NAME
-  or
-  POST /session/start
+#### Start a New Session
+
+```http
+POST /session/start
+GET /session/start?session=SESSION_NAME
 ```
 
-| Parameter | Type     | Description                            |
-| :-------- | :------- | :------------------------------------- |
-| `session` | `string` | **Required**. Create Your Session Name |
+**Body (POST):**
+| Parameter | Type     | Description                                                    |
+| :-------- | :------- | :------------------------------------------------------------- |
+| `session` | `string` | **Required for admin**. Session name. Regular users use their username automatically |
+
+**Notes:**
+- Regular users: Session name is automatically set to their username or configured session_name
+- Admin users: Can specify any custom session name
+- Returns QR code if session needs to be linked
+- Returns success message if already connected
+
+**Example (Regular User):**
+```bash
+curl -u john:password123 -X POST http://localhost:5001/session/start \
+  -H "Content-Type: application/json" \
+  -d '{"session": "john"}'  # Must match username
+```
+
+**Example (Admin):**
+```bash
+curl -u admin:admin -X POST http://localhost:5001/session/start \
+  -H "Content-Type: application/json" \
+  -d '{"session": "sales_team"}'  # Can use any name
+```
+
+#### Get All Sessions
+
+```http
+GET /session
+```
+
+**Returns:**
+- For admin: All sessions
+- For regular users: Only their own session (if exists)
+
+#### Delete Session
+
+```http
+GET /session/logout?session=SESSION_NAME
+POST /session/logout
+```
+
+| Parameter | Type     | Description                       |
+| :-------- | :------- | :-------------------------------- |
+| `session` | `string` | **Required**. Session name to delete |
+
+**Notes:**
+- Regular users can only delete their own session
+- Admin can delete any session
+
+### Messaging
 
 #### Send Text Message
 
-```
-  POST /message/send-text
+```http
+POST /message/send-text
 ```
 
-| Body       | Type      | Description                                                              |
-| :--------- | :-------- | :----------------------------------------------------------------------- |
-| `session`  | `string`  | **Required**. Session Name You Have Created                              |
-| `to`       | `string`  | **Required**. Receiver Phone Number with Country Code (e.g: 62812345678) |
-| `text`     | `string`  | **Required**. Text Message                                               |
-| `is_group` | `boolean` | **Optional**. True if "to" field is group ids                            |
+| Body                  | Type      | Description                                                              |
+| :-------------------- | :-------- | :----------------------------------------------------------------------- |
+| `session`             | `string`  | **Required**. Your session name (username for regular users)             |
+| `to`                  | `string`  | **Required**. Receiver phone number with country code (e.g., 628123456789) |
+| `text`                | `string`  | **Required**. Text message content                                       |
+| `is_group`            | `boolean` | **Optional**. Set to `true` if sending to a group                        |
+| `quoted_message_id`   | `string`  | **Optional**. Message ID to reply to (for quoting/replying)             |
+
+**Example:**
+```bash
+curl -u john:password123 -X POST http://localhost:5001/message/send-text \
+  -H "Content-Type: application/json" \
+  -d '{
+    "session": "john",
+    "to": "628123456789",
+    "text": "Hello World!"
+  }'
+```
+
+**Example (Reply to a message):**
+```bash
+curl -u john:password123 -X POST http://localhost:5001/message/send-text \
+  -H "Content-Type: application/json" \
+  -d '{
+    "session": "john",
+    "to": "628123456789",
+    "text": "This is a reply!",
+    "quoted_message_id": "MESSAGE_ID_FROM_WEBHOOK"
+  }'
+```
 
 #### Send Image
 
-```
-  POST /message/send-image
+```http
+POST /message/send-image
 ```
 
-| Body        | Type      | Description                                                              |
-| :---------- | :-------- | :----------------------------------------------------------------------- |
-| `session`   | `string`  | **Required**. Session Name You Have Created                              |
-| `to`        | `string`  | **Required**. Receiver Phone Number with Country Code (e.g: 62812345678) |
-| `text`      | `string`  | **Required**. Caption Massage                                            |
-| `image_url` | `string`  | **Required**. URL Image                                                  |
-| `is_group`  | `boolean` | **Optional**. True if "to" field is group ids                            |
+| Body                  | Type      | Description                                                              |
+| :-------------------- | :-------- | :----------------------------------------------------------------------- |
+| `session`             | `string`  | **Required**. Your session name                                          |
+| `to`                  | `string`  | **Required**. Receiver phone number with country code                    |
+| `text`                | `string`  | **Required**. Image caption                                              |
+| `image_url`           | `string`  | **Required**. Image URL (http/https or file:// path)                     |
+| `is_group`            | `boolean` | **Optional**. Set to `true` if sending to a group                        |
+| `quoted_message_id`   | `string`  | **Optional**. Message ID to reply to                                     |
+
+**Example:**
+```bash
+curl -u john:password123 -X POST http://localhost:5001/message/send-image \
+  -H "Content-Type: application/json" \
+  -d '{
+    "session": "john",
+    "to": "628123456789",
+    "text": "Check out this image!",
+    "image_url": "https://example.com/image.jpg"
+  }'
+```
 
 #### Send Document
 
-```
-  POST /message/send-document
-```
-
-| Body            | Type      | Description                                                              |
-| :-------------- | :-------- | :----------------------------------------------------------------------- |
-| `session`       | `string`  | **Required**. Session Name You Have Created                              |
-| `to`            | `string`  | **Required**. Receiver Phone Number with Country Code (e.g: 62812345678) |
-| `text`          | `string`  | **Required**. Caption Massage                                            |
-| `document_url`  | `string`  | **Required**. Document URL                                               |
-| `document_name` | `string`  | **Required**. Document Name                                              |
-| `is_group`      | `boolean` | **Optional**. True if "to" field is group ids                            |
-
-#### Delete session
-
-```
-  GET /session/logout?session=SESSION_NAME
+```http
+POST /message/send-document
 ```
 
-| Parameter | Type     | Description                            |
-| :-------- | :------- | :------------------------------------- |
-| `session` | `string` | **Required**. Create Your Session Name |
+| Body                  | Type      | Description                                                              |
+| :-------------------- | :-------- | :----------------------------------------------------------------------- |
+| `session`             | `string`  | **Required**. Your session name                                          |
+| `to`                  | `string`  | **Required**. Receiver phone number with country code                    |
+| `text`                | `string`  | **Required**. Document caption                                           |
+| `document_url`        | `string`  | **Required**. Document URL                                               |
+| `document_name`       | `string`  | **Required**. Document filename with extension                           |
+| `is_group`            | `boolean` | **Optional**. Set to `true` if sending to a group                        |
+| `quoted_message_id`   | `string`  | **Optional**. Message ID to reply to                                     |
 
-#### Get All Session ID
-
+**Example:**
+```bash
+curl -u john:password123 -X POST http://localhost:5001/message/send-document \
+  -H "Content-Type: application/json" \
+  -d '{
+    "session": "john",
+    "to": "628123456789",
+    "text": "Here is the document",
+    "document_url": "https://example.com/file.pdf",
+    "document_name": "report.pdf"
+  }'
 ```
-  GET /session
+
+#### Send Sticker
+
+```http
+POST /message/send-sticker
+```
+
+| Body                  | Type      | Description                                                              |
+| :-------------------- | :-------- | :----------------------------------------------------------------------- |
+| `session`             | `string`  | **Required**. Your session name                                          |
+| `to`                  | `string`  | **Required**. Receiver phone number with country code                    |
+| `image_url`           | `string`  | **Required**. Sticker image URL                                          |
+| `is_group`            | `boolean` | **Optional**. Set to `true` if sending to a group                        |
+| `quoted_message_id`   | `string`  | **Optional**. Message ID to reply to                                     |
+
+### Admin Endpoints
+
+#### Get All Users (Admin Only)
+
+```http
+GET /admin/users
+```
+
+Returns list of all regular users (passwords excluded).
+
+#### Create User (Admin Only)
+
+```http
+POST /admin/users
+```
+
+| Body       | Type     | Description                    |
+| :--------- | :------- | :----------------------------- |
+| `username` | `string` | **Required**. Min 3 characters |
+| `password` | `string` | **Required**. Min 4 characters |
+
+#### Update User Password (Admin Only)
+
+```http
+PUT /admin/users/:id/password
+```
+
+| Body       | Type     | Description                    |
+| :--------- | :------- | :----------------------------- |
+| `password` | `string` | **Required**. New password     |
+
+#### Update User Session Config (Admin Only)
+
+```http
+PUT /admin/users/:id/session-config
+```
+
+| Body           | Type     | Description                         |
+| :------------- | :------- | :---------------------------------- |
+| `session_name` | `string` | **Optional**. Custom session name   |
+| `callback_url` | `string` | **Optional**. Webhook callback URL  |
+
+#### Delete User (Admin Only)
+
+```http
+DELETE /admin/users/:id
 ```
 
 ## Examples
 
-### Using Axios
+### Using cURL
+
+```bash
+# Regular user sending a text message
+curl -u john:password123 -X POST http://localhost:5001/message/send-text \
+  -H "Content-Type: application/json" \
+  -d '{
+    "session": "john",
+    "to": "628123456789",
+    "text": "Hello World!"
+  }'
+
+# Regular user sending an image
+curl -u john:password123 -X POST http://localhost:5001/message/send-image \
+  -H "Content-Type: application/json" \
+  -d '{
+    "session": "john",
+    "to": "628123456789",
+    "text": "Check this out!",
+    "image_url": "https://placehold.co/600x400"
+  }'
+
+# Sending to a group
+curl -u john:password123 -X POST http://localhost:5001/message/send-text \
+  -H "Content-Type: application/json" \
+  -d '{
+    "session": "john",
+    "to": "120363123456789012@g.us",
+    "text": "Hello Group!",
+    "is_group": true
+  }'
+```
+
+### Using Axios (JavaScript)
 
 ```js
-// Configure axios with authentication
 const axios = require('axios');
 
+// Configure axios with authentication
 const api = axios.create({
   baseURL: 'http://localhost:5001',
   auth: {
-    username: 'yourusername',
-    password: 'yourpassword'
+    username: 'john',
+    password: 'password123'
   }
 });
 
-// send text
+// Send text message
 api.post("/message/send-text", {
-  session: "yourusername_mysession",  // Note: prefixed with username for regular users
-  to: "62812345678",
-  text: "hello world",
+  session: "john",
+  to: "628123456789",
+  text: "Hello World!",
 });
 
-// send image
+// Send image
 api.post("/message/send-image", {
-  session: "yourusername_mysession",
-  to: "62812345678",
-  text: "hello world",
+  session: "john",
+  to: "628123456789",
+  text: "Check out this image!",
   image_url: "https://placehold.co/600x400",
 });
+
+// Send document
+api.post("/message/send-document", {
+  session: "john",
+  to: "628123456789",
+  text: "Here's the file",
+  document_url: "https://example.com/report.pdf",
+  document_name: "report.pdf"
+});
+
+// Reply to a message
+api.post("/message/send-text", {
+  session: "john",
+  to: "628123456789",
+  text: "This is a reply!",
+  quoted_message_id: "MESSAGE_ID_FROM_WEBHOOK"
+});
+```
+
+### Using Python Requests
+
+```python
+import requests
+from requests.auth import HTTPBasicAuth
+
+# Setup authentication
+auth = HTTPBasicAuth('john', 'password123')
+base_url = 'http://localhost:5001'
+
+# Send text message
+response = requests.post(
+    f'{base_url}/message/send-text',
+    auth=auth,
+    json={
+        'session': 'john',
+        'to': '628123456789',
+        'text': 'Hello from Python!'
+    }
+)
+
+# Send image
+response = requests.post(
+    f'{base_url}/message/send-image',
+    auth=auth,
+    json={
+        'session': 'john',
+        'to': '628123456789',
+        'text': 'Check this image!',
+        'image_url': 'https://placehold.co/600x400'
+    }
+)
 ```
 
 ## Webhook Guide
 
-Set your webhook URL in the environment variable `WEBHOOK_BASE_URL` or in the `.env` file.
-The request method will be `POST` and the body will be in JSON format.
+### Per-User Webhooks
 
+Each regular user can configure their own webhook URL to receive messages and session status updates. This is useful when you have multiple users and want each to receive callbacks at different endpoints.
+
+**Configure via Dashboard:**
+1. Login to `/dashboard` with user credentials
+2. Enter webhook URL in the settings
+3. Click Save
+
+**Configure via API:**
+```bash
+curl -u john:password123 -X PUT http://localhost:5001/dashboard/callback \
+  -H "Content-Type: application/json" \
+  -d '{"callback_url": "https://your-domain.com/webhook"}'
 ```
-WEBHOOK_BASE_URL="http://yourdomain.com/webhook"
+
+### Legacy Global Webhook
+
+You can also set a global webhook URL in `.env` that receives all events from all users:
+
+```env
+WEBHOOK_BASE_URL=https://your-domain.com/webhook
 ```
 
-### 🪝 Session Webhook
+**Note:** If both per-user and global webhooks are configured, both will receive the events.
 
-Request path:
+### Webhook Events
 
-```
-POST http://yourdomain.com/webhook/session
-```
+All webhook requests use `POST` method with JSON body.
 
-Example body:
+#### 🪝 Message Webhook
 
-```js
+Triggered when a message is received.
+
+**Endpoint:** `POST {callback_url}`
+
+**Example Body:**
+```json
 {
-  "session": "mysession",
-  "status": "connected" //  "disconnected" | "connecting"
-}
-```
-
-### 🪝 Message Webhook
-
-Request path:
-
-```
-POST http://yourdomain.com/webhook/message
-```
-
-Example body:
-
-```js
-{
-  "session": "mysession",
-  "from": "xxx@s.whatsapp.net",
+  "session": "john",
+  "from": "628123456789@s.whatsapp.net",
+  "messageId": "3A5089C2F2652D46EBC5",
   "message": "Hello World",
   "media": {
-    "image": "3A5089C2F2652D46EBC5.jpg",
+    "image": null,
     "video": null,
     "document": null,
     "audio": null
@@ -272,9 +621,32 @@ Example body:
 }
 ```
 
-You can get the media file by using the `media` object in the webhook message. The media file will be saved in the `./media` directory with the name specified in the `media` object.
-You can access media files using the following URL format:
+**Note:** The `messageId` can be used with the `quoted_message_id` parameter to reply to messages.
 
+#### 🪝 Session Webhook
+
+Triggered when session status changes.
+
+**Endpoint:** `POST {callback_url}/session`
+
+**Example Body:**
+```json
+{
+  "session": "john",
+  "status": "connected"  // or "disconnected" | "connecting"
+}
+```
+
+### Accessing Media Files
+
+When a message contains media (image, video, document, audio), the media file is saved to the `./media` directory and the filename is included in the webhook.
+
+**Access media via URL:**
+```
+http://localhost:5001/media/{filename}
+```
+
+**Example:**
 ```
 http://localhost:5001/media/3A5089C2F2652D46EBC5.jpg
 ```
