@@ -319,7 +319,7 @@ curl -u admin:admin -X PUT http://localhost:5001/admin/users/1/session-config \
 
 **How It Works:**
 
-1. The system automatically fetches OAuth tokens from `{callback_url_origin}/oauth/token` using the `client_credentials` grant type
+1. The system automatically fetches OAuth tokens from `{callback_url_origin}/oauth/token` using the `client_credentials` grant type with form-encoded data
 2. Tokens are cached and automatically renewed when expired (or within 5 minutes of expiration)
 3. All webhook requests include `Authorization: Bearer <token>` header when OAuth is configured
 4. If token fetch fails, webhooks are sent without authentication
@@ -328,6 +328,16 @@ curl -u admin:admin -X PUT http://localhost:5001/admin/users/1/session-config \
 
 The OAuth token endpoint is automatically determined from your callback URL:
 - Callback URL: `https://example.com/webhook` → Token URL: `https://example.com/oauth/token`
+
+**Token Request Format:**
+
+The gateway sends a standard OAuth 2.0 token request:
+```http
+POST /oauth/token
+Content-Type: application/x-www-form-urlencoded
+
+grant_type=client_credentials&client_id={oauth_login}&client_secret={oauth_password}
+```
 
 **Expected Token Response:**
 ```json

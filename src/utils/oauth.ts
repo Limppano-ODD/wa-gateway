@@ -20,19 +20,17 @@ export async function fetchOAuthToken(
   tokenUrl: string
 ): Promise<OAuthTokenResponse> {
   try {
-    const response = await axios.post(
-      tokenUrl,
-      {
-        grant_type: "client_credentials",
-        client_id: oauthLogin,
-        client_secret: oauthPassword,
+    // Use URLSearchParams for standard OAuth 2.0 form-encoded format
+    const params = new URLSearchParams();
+    params.append("grant_type", "client_credentials");
+    params.append("client_id", oauthLogin);
+    params.append("client_secret", oauthPassword);
+
+    const response = await axios.post(tokenUrl, params, {
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
       },
-      {
-        headers: {
-          "Content-Type": "application/json",
-        },
-      }
-    );
+    });
 
     return response.data;
   } catch (error) {
