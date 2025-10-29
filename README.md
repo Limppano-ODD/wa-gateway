@@ -2,6 +2,26 @@
 
 Easy Setup Headless multi-user WhatsApp Gateway with NodeJS
 
+## 📑 Table of Contents
+
+- [New Features](#-new-features)
+- [Core Features](#core-features)
+- [Requirements](#️-this-application-need-to-running-in-nodejs-v18-or-later-️)
+- [Install and Running](#install-and-running)
+  - [NPM Installation](#option-1-using-npm-developmentdirect)
+  - [Docker Installation](#option-2-using-docker-recommended-for-production)
+- [Access the Application](#access-the-application)
+- [User Types and Authentication](#-user-types-and-authentication)
+- [How to Use](#-how-to-use)
+- [Authentication](#-authentication)
+- [How to Send Messages](#-how-to-send-messages)
+- [Webhook Configuration](#-webhook-configuration)
+- [API Reference](#api-reference)
+- [Examples](#examples)
+- [Webhook Guide](#webhook-guide)
+- [Troubleshooting & FAQ](#-troubleshooting--faq)
+- [Upgrading](#upgrading)
+
 ## 🆕 New Features
 
 - **Multi-user Support**: Multiple users with individual authentication
