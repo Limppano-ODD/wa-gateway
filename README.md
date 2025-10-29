@@ -268,6 +268,32 @@ Both per-user and global webhooks will receive events if configured.
 
 **Note**: All API endpoints require HTTP Basic Authentication.
 
+### Quick Reference
+
+**Session Management:**
+- `POST /session/start` - Start a new session
+- `GET /session` - List sessions
+- `POST /session/logout` - Delete a session
+
+**Messaging:**
+- `POST /message/send-text` - Send text message
+- `POST /message/send-image` - Send image
+- `POST /message/send-document` - Send document
+- `POST /message/send-sticker` - Send sticker
+
+**Admin (Admin only):**
+- `GET /admin/users` - List all users
+- `POST /admin/users` - Create new user
+- `PUT /admin/users/:id/password` - Update user password
+- `PUT /admin/users/:id/session-config` - Update session config
+- `DELETE /admin/users/:id` - Delete user
+
+**Dashboard (Regular users):**
+- `GET /dashboard/session-info` - Get session information
+- `POST /dashboard/start-session` - Start session with QR
+- `POST /dashboard/disconnect-session` - Disconnect session
+- `PUT /dashboard/callback` - Update webhook URL
+
 ### Authentication Header
 
 All requests must include HTTP Basic Auth credentials:
@@ -697,6 +723,64 @@ http://localhost:5001/media/{filename}
 ```
 http://localhost:5001/media/3A5089C2F2652D46EBC5.jpg
 ```
+
+## ❓ Troubleshooting & FAQ
+
+### Common Issues
+
+**Q: I'm getting "Unauthorized" when trying to access the API**
+
+A: Make sure you're including HTTP Basic Auth credentials in your request:
+```bash
+curl -u username:password http://localhost:5001/endpoint
+```
+
+**Q: Can I change my admin password?**
+
+A: Yes! Update the `ADMIN_PASSWORD` in your `.env` file and restart the server.
+
+**Q: I forgot a user's password. How do I reset it?**
+
+A: Login as admin, go to `/admin`, find the user, and update their password.
+
+**Q: How many sessions can a regular user have?**
+
+A: Each regular user has ONE WhatsApp session. Only admin can create multiple sessions with different names.
+
+**Q: My QR code expired before I could scan it**
+
+A: Simply refresh the page or click "Generate QR Code" again to get a new QR code.
+
+**Q: Can I send messages to groups?**
+
+A: Yes! Set `"is_group": true` in your request and use the group ID (ending with `@g.us`) in the `to` field.
+
+**Q: How do I get a group ID?**
+
+A: Group IDs are sent to your webhook when you receive messages from a group. They typically look like `120363123456789012@g.us`.
+
+**Q: My webhook isn't receiving messages**
+
+A: 
+1. Verify your callback URL is correct in the dashboard
+2. Make sure your webhook endpoint is publicly accessible
+3. Check your webhook server logs for incoming requests
+4. Ensure your webhook endpoint accepts POST requests with JSON body
+
+**Q: Can I use this with Docker?**
+
+A: Yes! See the Docker installation instructions above. Docker is recommended for production deployments.
+
+**Q: What's the difference between per-user webhooks and global webhook?**
+
+A: 
+- **Per-user webhook**: Each user configures their own callback URL. Only that user's messages are sent to their webhook.
+- **Global webhook**: Set via `WEBHOOK_BASE_URL` environment variable. Receives ALL messages from ALL users.
+- Both can be active simultaneously.
+
+**Q: How do I update to the latest version?**
+
+A: Run `npm install wa-multi-session@latest` and restart the server.
 
 ## Upgrading
 
