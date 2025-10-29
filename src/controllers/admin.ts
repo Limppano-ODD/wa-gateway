@@ -97,6 +97,8 @@ export const createAdminController = () => {
   const updateSessionConfigSchema = z.object({
     session_name: z.string().optional(),
     callback_url: z.string().url().optional().nullable(),
+    oauth_login: z.string().optional().nullable(),
+    oauth_password: z.string().optional().nullable(),
   });
 
   app.put(
@@ -125,6 +127,13 @@ export const createAdminController = () => {
 
       if (payload.callback_url !== undefined) {
         userDb.updateUserCallbackUrl(userId, payload.callback_url);
+      }
+
+      if (payload.oauth_login !== undefined || payload.oauth_password !== undefined) {
+        userDb.updateUserOAuthConfig(userId, {
+          oauth_login: payload.oauth_login,
+          oauth_password: payload.oauth_password,
+        });
       }
 
       return c.json({

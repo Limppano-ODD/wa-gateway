@@ -109,12 +109,43 @@ import { User, userDb } from "./database/db";
 import axios from "axios";
 import { MessageReceived } from "wa-multi-session";
 import { messageStore } from "./utils/message-store";
+import { getValidOAuthToken, getOAuthTokenUrl } from "./utils/oauth";
 
-// Helper function to get callback URL for a session
-const getCallbackForSession = (sessionName: string): string | null => {
+// Helper function to get user for a session
+const getUserForSession = (sessionName: string): User | null => {
   const user = userDb.getUserBySessionName(sessionName);
-  return user?.callback_url || null;
+  return user || null;
 };
+
+// Helper function to send webhook with OAuth support
+async function sendWebhookWithAuth(
+  url: string,
+  body: any,
+  user: User | null
+): Promise<void> {
+  try {
+    const headers: any = {
+      "Content-Type": "application/json",
+    };
+
+    // Add OAuth token if configured
+    if (user?.oauth_login && user?.oauth_password) {
+      const tokenUrl = getOAuthTokenUrl(url);
+      const token = await getValidOAuthToken(user, tokenUrl);
+      if (token) {
+        headers["Authorization"] = `Bearer ${token}`;
+      }
+    }
+
+    await axios.post(url, body, { headers });
+  } catch (error) {
+    if (axios.isAxiosError(error)) {
+      console.error(`Failed to send webhook to ${url}:`, error.message);
+    } else {
+      console.error(`Failed to send webhook to ${url}:`, error);
+    }
+  }
+}
 
 // Message webhook with per-user callbacks
 whastapp.onMessageReceived(async (message: MessageReceived) => {
@@ -124,7 +155,9 @@ whastapp.onMessageReceived(async (message: MessageReceived) => {
   if (message.key.fromMe || message.key.remoteJid?.includes("broadcast"))
     return;
 
-  const callbackUrl = getCallbackForSession(message.sessionId);
+  const user = getUserForSession(message.sessionId);
+  const callbackUrl = user?.callback_url;
+  
   if (!callbackUrl) {
     console.log(`No callback URL configured for session: ${message.sessionId}`);
     return;
@@ -155,22 +188,22 @@ whastapp.onMessageReceived(async (message: MessageReceived) => {
     },
   };
   console.log(body);
-  const webhookUrls = [endpoint];
-    if (env.WEBHOOK_BASE_URL) {
-      webhookUrls.push(env.WEBHOOK_BASE_URL);
-    }
-
-    webhookUrls.forEach(url => {
-      axios.post(url, body).catch((error) => {
-        console.error(`Failed to send webhook to ${url}:`, error.message);
-      });
-    });
+  
+  // Send to user's callback URL with OAuth
+  await sendWebhookWithAuth(endpoint, body, user);
+  
+  // Also send to legacy global webhook if configured
+  if (env.WEBHOOK_BASE_URL) {
+    await sendWebhookWithAuth(env.WEBHOOK_BASE_URL, body, null);
+  }
 
 });
 
 // Session webhook with per-user callbacks
-const sendSessionWebhook = (sessionName: string, status: "connected" | "connecting" | "disconnected") => {
-  const callbackUrl = getCallbackForSession(sessionName);
+const sendSessionWebhook = async (sessionName: string, status: "connected" | "connecting" | "disconnected") => {
+  const user = getUserForSession(sessionName);
+  const callbackUrl = user?.callback_url;
+  
   if (!callbackUrl) {
     return;
   }
@@ -181,9 +214,13 @@ const sendSessionWebhook = (sessionName: string, status: "connected" | "connecti
     status: status,
   };
   
-  axios.post(endpoint, body).catch((error) => {
-    console.error(`Failed to send session webhook to ${endpoint}:`, error.message);
-  });
+  // Send to user's callback URL with OAuth
+  await sendWebhookWithAuth(endpoint, body, user);
+  
+  // Also send to legacy global webhook if configured
+  if (env.WEBHOOK_BASE_URL) {
+    await sendWebhookWithAuth(`${env.WEBHOOK_BASE_URL}/session`, body, null);
+  }
 };
 
 whastapp.onConnected((session) => {

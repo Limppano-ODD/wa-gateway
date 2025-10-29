@@ -47,6 +47,41 @@ export const createDashboardController = () => {
     }
   );
 
+  // Update OAuth configuration for current user
+  const updateOAuthSchema = z.object({
+    oauth_login: z.string().nullable(),
+    oauth_password: z.string().nullable(),
+  });
+
+  app.put(
+    "/oauth",
+    requestValidator("json", updateOAuthSchema),
+    async (c) => {
+      const user = c.get("user") as User;
+      const payload = c.req.valid("json");
+
+      if (user.is_admin === 1) {
+        throw new HTTPException(400, {
+          message: "Admin users cannot configure OAuth",
+        });
+      }
+
+      userDb.updateUserOAuthConfig(user.id, {
+        oauth_login: payload.oauth_login,
+        oauth_password: payload.oauth_password,
+        // Reset token when credentials change
+        oauth_token: null,
+        oauth_token_expiration: null,
+      });
+
+      return c.json({
+        data: {
+          message: "OAuth configuration updated successfully",
+        },
+      });
+    }
+  );
+
   // Get user session info
   app.get("/session-info", async (c) => {
     const user = c.get("user") as User;
@@ -66,6 +101,8 @@ export const createDashboardController = () => {
       data: {
         session_name: sessionName,
         callback_url: user.callback_url,
+        oauth_login: user.oauth_login,
+        oauth_configured: !!(user.oauth_login && user.oauth_password),
         is_connected: isConnected,
       },
     });
