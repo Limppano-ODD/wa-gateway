@@ -29,8 +29,8 @@ export const createSessionController = () => {
       });
     }
     
-    // Regular users only see their single session
-    const sessionName = user.session_name || user.username;
+    // Regular users only see their single session (username = session name)
+    const sessionName = user.username;
     const userSession = whatsapp.getSession(sessionName);
     
     return c.json({
@@ -49,11 +49,8 @@ export const createSessionController = () => {
       const payload = c.req.valid("json");
       const user = c.get("user") as User;
 
-      // For regular users, use their configured session name or username
-      // For admin users, allow custom session name from payload
-      const sessionName = user.is_admin === 1 
-        ? payload.session 
-        : (user.session_name || user.username);
+      // Always use username as session name to maintain consistency
+      const sessionName = user.username;
 
       const isExist = whatsapp.getSession(sessionName);
       if (isExist) {
@@ -95,11 +92,8 @@ export const createSessionController = () => {
       const payload = c.req.valid("query");
       const user = c.get("user") as User;
 
-      // For regular users, use their configured session name or username
-      // For admin users, allow custom session name from payload
-      const sessionName = user.is_admin === 1 
-        ? payload.session 
-        : (user.session_name || user.username);
+      // Always use username as session name to maintain consistency
+      const sessionName = user.username;
 
       const isExist = whatsapp.getSession(sessionName);
       if (isExist) {
@@ -225,10 +219,10 @@ export const createSessionController = () => {
     const user = c.get("user") as User;
     const sessionParam = c.req.query().session || (await c.req.json()).session || "";
     
-    // For non-admin users, ensure they can only delete their own sessions
-    if (user.is_admin !== 1 && !sessionParam.startsWith(user.username + "_")) {
+    // For non-admin users, ensure they can only delete their own session (which matches their username)
+    if (user.is_admin !== 1 && sessionParam !== user.username) {
       throw new HTTPException(403, {
-        message: "You can only delete your own sessions",
+        message: "You can only delete your own session",
       });
     }
     

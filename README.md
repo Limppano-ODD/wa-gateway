@@ -30,6 +30,7 @@ Easy Setup Headless multi-user WhatsApp Gateway with NodeJS
 - **SQLite Database**: Secure credential storage with bcrypt hashing
 - **Web Dashboard**: User-friendly UI for session management and QR code generation
 - **Per-User Webhooks**: Configure individual webhook URLs for each user
+- **OAuth 2.0 Support**: Automatic OAuth token management for webhook authentication
 - **Reply/Quote Messages**: Send messages as replies to previous messages
 
 ## Core Features
@@ -279,6 +280,74 @@ curl -u myuser:mypassword -X PUT http://localhost:5001/dashboard/callback \
   -d '{"callback_url": "https://your-domain.com/webhook"}'
 ```
 
+### OAuth Authentication for Webhooks
+
+The gateway supports OAuth 2.0 authentication when making webhook calls. This adds an `Authorization: Bearer <token>` header to all webhook requests.
+
+**Configuration:**
+
+Each user can configure OAuth credentials for their webhook endpoint:
+
+**Via Dashboard:**
+1. Login to `/dashboard`
+2. Scroll to "OAuth Configuration"
+3. Enter your OAuth Client ID/Login and Client Secret/Password
+4. Click "Save"
+
+**Via API:**
+```bash
+curl -u myuser:mypassword -X PUT http://localhost:5001/dashboard/oauth \
+  -H "Content-Type: application/json" \
+  -d '{
+    "oauth_login": "your_client_id",
+    "oauth_password": "your_client_secret"
+  }'
+```
+
+**Via Admin Panel:**
+When creating or configuring a user, admins can set OAuth credentials:
+
+```bash
+# Update OAuth config for existing user
+curl -u admin:admin -X PUT http://localhost:5001/admin/users/1/session-config \
+  -H "Content-Type: application/json" \
+  -d '{
+    "oauth_login": "client_id",
+    "oauth_password": "client_secret"
+  }'
+```
+
+**How It Works:**
+
+1. The system automatically fetches OAuth tokens from `{callback_url_origin}/oauth/token` using the `client_credentials` grant type with form-encoded data
+2. Tokens are cached and automatically renewed when expired (or within 5 minutes of expiration)
+3. All webhook requests include `Authorization: Bearer <token>` header when OAuth is configured
+4. If token fetch fails, webhooks are sent without authentication
+
+**OAuth Token Endpoint:**
+
+The OAuth token endpoint is automatically determined from your callback URL:
+- Callback URL: `https://example.com/webhook` → Token URL: `https://example.com/oauth/token`
+
+**Token Request Format:**
+
+The gateway sends a standard OAuth 2.0 token request:
+```http
+POST /oauth/token
+Content-Type: application/x-www-form-urlencoded
+
+grant_type=client_credentials&client_id={oauth_login}&client_secret={oauth_password}
+```
+
+**Expected Token Response:**
+```json
+{
+  "access_token": "your_token_here",
+  "expires_in": 3600,
+  "token_type": "Bearer"
+}
+```
+
 ### Legacy Global Webhook
 
 You can still set a global webhook URL via environment variable that receives all events:
@@ -287,7 +356,7 @@ You can still set a global webhook URL via environment variable that receives al
 WEBHOOK_BASE_URL=https://your-domain.com/webhook
 ```
 
-Both per-user and global webhooks will receive events if configured.
+Both per-user and global webhooks will receive events if configured. OAuth authentication is only applied to per-user webhooks, not the global webhook.
 
 ## API Reference
 
@@ -318,6 +387,7 @@ Both per-user and global webhooks will receive events if configured.
 - `POST /dashboard/start-session` - Start session with QR
 - `POST /dashboard/disconnect-session` - Disconnect session
 - `PUT /dashboard/callback` - Update webhook URL
+- `PUT /dashboard/oauth` - Update OAuth configuration
 
 ### Authentication Header
 
@@ -538,10 +608,23 @@ PUT /admin/users/:id/password
 PUT /admin/users/:id/session-config
 ```
 
-| Body           | Type     | Description                         |
-| :------------- | :------- | :---------------------------------- |
-| `session_name` | `string` | **Optional**. Custom session name   |
-| `callback_url` | `string` | **Optional**. Webhook callback URL  |
+| Body             | Type     | Description                                |
+| :--------------- | :------- | :----------------------------------------- |
+| `session_name`   | `string` | **Optional**. Custom session name          |
+| `callback_url`   | `string` | **Optional**. Webhook callback URL         |
+| `oauth_login`    | `string` | **Optional**. OAuth client ID/login        |
+| `oauth_password` | `string` | **Optional**. OAuth client secret/password |
+
+**Example:**
+```bash
+curl -u admin:admin -X PUT http://localhost:5001/admin/users/1/session-config \
+  -H "Content-Type: application/json" \
+  -d '{
+    "callback_url": "https://your-domain.com/webhook",
+    "oauth_login": "your_client_id",
+    "oauth_password": "your_client_secret"
+  }'
+```
 
 #### Delete User (Admin Only)
 
