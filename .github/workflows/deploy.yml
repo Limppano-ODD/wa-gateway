@@ -63,17 +63,6 @@ jobs:
       DB_PATH: ${{ vars.DB_PATH }}
       PORT: ${{ vars.PORT }}
     steps:
-      - name: Debug - Show runner info BEFORE checkout
-        run: |
-          echo "=== RUNNER INFO BEFORE CHECKOUT ==="
-          echo "Current directory: $(pwd)"
-          echo "Home directory: $HOME"
-          echo "GitHub workspace: $GITHUB_WORKSPACE"
-          echo "Repository name: ${{ github.event.repository.name }}"
-          echo ""
-          echo "=== /app STRUCTURE ==="
-          ls -la /app/ 2>/dev/null || echo "/app not accessible"
-
       - name: Ensure project directory exists and clean
         run: |
           echo "Ensuring directory exists: $PROJECT_DIR"
@@ -91,46 +80,6 @@ jobs:
           rsync -av --exclude='.git' "$GITHUB_WORKSPACE/" "$PROJECT_DIR/"
           echo "Files copied successfully"
           ls -la "$PROJECT_DIR" | head -20
-          
-      - name: Debug - After checkout
-        run: |
-          cd "$PROJECT_DIR"
-          echo "=== AFTER CHECKOUT ==="
-          echo "Current directory: $(pwd)"
-          echo "Git branch: $(git branch --show-current 2>/dev/null || echo 'detached HEAD')"
-          echo "Git commit: $(git rev-parse --short HEAD 2>/dev/null || echo 'no git')"
-          echo ""
-          echo "=== FILES IN CURRENT DIR ==="
-          ls -la | head -20
-          echo ""
-          echo "=== /app STRUCTURE (all projects) ==="
-          ls -la /app/
-          echo ""
-          echo "=== Checking if we're in the right place ==="
-          test -f package.json && echo "✅ package.json found" || echo "❌ package.json NOT found"
-          test -f docker-compose.yml && echo "✅ docker-compose.yml found" || echo "❌ docker-compose.yml NOT found"
-
-      - name: Check Docker access
-        run: docker info
-
-      - name: Debug - Print Environment Variables
-        run: |
-          echo "🔍 Verificando variáveis de ambiente..."
-          echo "NEXTAUTH_SECRET: ${NEXTAUTH_SECRET:+SET (hidden)}"
-          echo "NODE_ENV: $NODE_ENV"
-          echo "NEXTAUTH_URL: $NEXTAUTH_URL"
-          echo "AZURE_AD_CLIENT_ID: ${AZURE_AD_CLIENT_ID:0:10}..."
-          echo "AZURE_AD_CLIENT_SECRET: ${AZURE_AD_CLIENT_SECRET:+SET (hidden)}"
-          echo "AZURE_AD_TENANT_ID: ${AZURE_AD_TENANT_ID:0:10}..."
-          echo "DATABASE_URL: ${DATABASE_URL:+SET (hidden)}"
-          echo "VENDEDORES_API_URL: $VENDEDORES_API_URL"
-          echo "VENDEDORES_API_USERNAME: $VENDEDORES_API_USERNAME"
-          echo "VENDEDORES_API_EMAIL: $VENDEDORES_API_EMAIL"
-          echo "AWS_REGION: $AWS_REGION"
-          echo "AWS_S3_BUCKET_NAME: $AWS_S3_BUCKET_NAME"
-          echo "AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:0:10}..."
-          echo ""
-          echo "✅ Verificação de variáveis concluída"
 
       - name: Fazer deploy via Docker Compose
         id: deploy
