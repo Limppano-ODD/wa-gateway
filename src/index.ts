@@ -184,11 +184,42 @@ whastapp.onMessageReceived(async (message: MessageReceived) => {
     }
   }
 
+  // Imagem / documento: baixa e manda base64 no payload pro CRM anexar no cliente.
+  let media:
+    | { kind: "image" | "document"; data: string; mimetype: string; filename: string; caption: string | null }
+    | null = null;
+  const imgMsg = (message.message as any)?.imageMessage;
+  const docMsg = (message.message as any)?.documentMessage;
+  if (imgMsg || docMsg) {
+    try {
+      const isImg = !!imgMsg;
+      const ext = isImg ? "jpg" : "bin";
+      const tmp = path.join(
+        "/tmp",
+        `wa-media-${(message.key.id || Date.now()).toString().replace(/\W/g, "")}.${ext}`,
+      );
+      if (isImg) await message.saveImage(tmp);
+      else await message.saveDocument(tmp);
+      const buf = await fs.promises.readFile(tmp);
+      media = {
+        kind: isImg ? "image" : "document",
+        data: buf.toString("base64"),
+        mimetype: (isImg ? imgMsg.mimetype : docMsg.mimetype) || (isImg ? "image/jpeg" : "application/octet-stream"),
+        filename: (!isImg && docMsg.fileName) ? String(docMsg.fileName) : (isImg ? "foto.jpg" : "arquivo.bin"),
+        caption: (isImg ? imgMsg.caption : docMsg.caption) || null,
+      };
+      await fs.promises.unlink(tmp).catch(() => {});
+    } catch (e) {
+      console.error("WA media download failed:", (e as Error).message);
+    }
+  }
+
   const body = {
     session: message.sessionId,
     from: message.key.remoteJid ?? null,
     messageId: message.key.id,
     audio,
+    media,
     message:
       message.message?.conversation ||
       message.message?.extendedTextMessage?.text ||
