@@ -162,11 +162,33 @@ whastapp.onMessageReceived(async (message: MessageReceived) => {
 
   const endpoint = `${callbackUrl}`;
 
-  
+  // Áudio (nota de voz): baixa e manda base64 no payload pro CRM transcrever.
+  let audio: { data: string; mimetype: string; seconds: number | null } | null = null;
+  const audioMsg = (message.message as any)?.audioMessage;
+  if (audioMsg) {
+    try {
+      const tmp = path.join(
+        "/tmp",
+        `wa-audio-${(message.key.id || Date.now()).toString().replace(/\W/g, "")}.ogg`,
+      );
+      await message.saveAudio(tmp);
+      const buf = await fs.promises.readFile(tmp);
+      audio = {
+        data: buf.toString("base64"),
+        mimetype: audioMsg.mimetype || "audio/ogg",
+        seconds: audioMsg.seconds ?? null,
+      };
+      await fs.promises.unlink(tmp).catch(() => {});
+    } catch (e) {
+      console.error("WA audio download failed:", (e as Error).message);
+    }
+  }
+
   const body = {
     session: message.sessionId,
     from: message.key.remoteJid ?? null,
     messageId: message.key.id,
+    audio,
     message:
       message.message?.conversation ||
       message.message?.extendedTextMessage?.text ||
