@@ -67,8 +67,13 @@ jobs:
         run: |
           echo "Ensuring directory exists: $PROJECT_DIR"
           mkdir -p "$PROJECT_DIR"
-          echo "Cleaning directory: $PROJECT_DIR"
-          rm -rf "$PROJECT_DIR"/* "$PROJECT_DIR"/.git "$PROJECT_DIR"/.[!.]* 2>/dev/null || true
+          echo "Cleaning directory (PRESERVANDO dados runtime: db, wa_credentials, media)"
+          # NUNCA apagar db/wa_credentials/media — sao bind-mounts com a sessao do
+          # WhatsApp e os usuarios/config (sqlite). Apagar quebra a integracao a
+          # cada deploy. Remove so o codigo + .git; rsync repoe o codigo depois.
+          find "$PROJECT_DIR" -mindepth 1 -maxdepth 1 \
+            ! -name db ! -name wa_credentials ! -name media \
+            -exec rm -rf {} + 2>/dev/null || true
           ls -la "$PROJECT_DIR"
 
       - name: Checkout do código

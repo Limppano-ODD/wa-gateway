@@ -152,23 +152,6 @@ whastapp.onMessageReceived(async (message: MessageReceived) => {
   if (message.key.fromMe || message.key.remoteJid?.includes("broadcast"))
     return;
 
-  // DEBUG (temporário): inspecionar campos que o baileys entrega p/ resolver
-  // o telefone real quando o remetente vem como @lid (privacidade).
-  if (!message.key.remoteJid?.endsWith("@g.us")) {
-    try {
-      console.log(
-        "WA_LID_DEBUG",
-        JSON.stringify({
-          topKeys: Object.keys(message),
-          key: message.key,
-          pushName: (message as any).pushName,
-          verifiedBizName: (message as any).verifiedBizName,
-          participant: (message as any).participant,
-        }),
-      );
-    } catch {}
-  }
-
   const user = getUserForSession(message.sessionId);
   const callbackUrl = user?.callback_url;
   
