@@ -7,7 +7,7 @@ import { HTTPException } from "hono/http-exception";
 import { userDb } from "../database/db";
 import { requestValidator } from "../middlewares/validation.middleware";
 import { z } from "zod";
-
+import { getQRCode, setQRCode, clearQRCode } from "../utils/qr-store";
 
 type Variables = {
   user: User;
@@ -160,9 +160,13 @@ export const createDashboardController = () => {
     const qr = await new Promise<string | null>(async (r) => {
       await whatsapp.startSession(sessionName, {
         onConnected() {
+          // Clear QR code when connected
+          clearQRCode(sessionName);
           r(null);
         },
-        onQRUpdated(qr) {
+        onQRUpdated(qr: string) {
+          // Store the latest QR code
+          setQRCode(sessionName, qr);
           r(qr);
         },
       });
@@ -182,6 +186,35 @@ export const createDashboardController = () => {
       data: {
         message: "Session connected",
         session_name: sessionName,
+      },
+    });
+  });
+
+  // Get current QR code for a session
+  app.get("/get-qr", async (c) => {
+    const user = c.get("user") as User;
+
+    if (user.is_admin === 1) {
+      throw new HTTPException(400, {
+        message: "Admin users cannot get QR codes",
+      });
+    }
+
+    const sessionName = user.username;
+    const qr = getQRCode(sessionName);
+
+    if (!qr) {
+      return c.json({
+        data: {
+          qr: null,
+        },
+      });
+    }
+
+    const qrDataUrl = await toDataURL(qr);
+    return c.json({
+      data: {
+        qr: qrDataUrl,
       },
     });
   });

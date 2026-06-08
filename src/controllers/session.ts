@@ -7,6 +7,7 @@ import { toDataURL } from "qrcode";
 import { HTTPException } from "hono/http-exception";
 import { basicAuthMiddleware } from "../middlewares/auth.middleware";
 import type { User } from "../database/db";
+import { setQRCode, clearQRCode } from "../utils/qr-store";
 
 type Variables = {
   user: User;
@@ -62,9 +63,13 @@ export const createSessionController = () => {
       const qr = await new Promise<string | null>(async (r) => {
         await whatsapp.startSession(sessionName, {
           onConnected() {
+            // Clear QR code when connected
+            clearQRCode(sessionName);
             r(null);
           },
-          onQRUpdated(qr) {
+          onQRUpdated(qr: string) {
+            // Store the latest QR code
+            setQRCode(sessionName, qr);
             r(qr);
           },
         });
@@ -105,9 +110,13 @@ export const createSessionController = () => {
       const qr = await new Promise<string | null>(async (r) => {
         await whatsapp.startSession(sessionName, {
           onConnected() {
+            // Clear QR code when connected
+            clearQRCode(sessionName);
             r(null);
           },
-          onQRUpdated(qr) {
+          onQRUpdated(qr: string) {
+            // Store the latest QR code
+            setQRCode(sessionName, qr);
             r(qr);
           },
         });

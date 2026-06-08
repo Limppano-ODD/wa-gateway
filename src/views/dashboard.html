@@ -434,8 +434,28 @@
                         document.getElementById('qrcodeContainer').style.display = 'block';
                         showMessage('statusMessage', 'Scan the QR code with your WhatsApp app', 'success');
                         
-                        // Poll for connection status
+                        // Poll for QR code updates and connection status
                         const pollInterval = setInterval(async () => {
+                            // Check for updated QR code
+                            try {
+                                const qrResponse = await fetch('/dashboard/get-qr', {
+                                    credentials: 'include'
+                                });
+                                const qrData = await qrResponse.json();
+                                
+                                if (qrResponse.ok && qrData.data.qr) {
+                                    // Update QR code if it has changed
+                                    const currentQr = document.getElementById('qrcodeImage').src;
+                                    if (currentQr !== qrData.data.qr) {
+                                        document.getElementById('qrcodeImage').src = qrData.data.qr;
+                                        console.log('QR code updated');
+                                    }
+                                }
+                            } catch (error) {
+                                console.error('Error fetching QR code:', error);
+                            }
+                            
+                            // Check connection status
                             await loadSessionInfo();
                             const statusEl = document.getElementById('sessionStatus');
                             if (statusEl.querySelector('.connected')) {
@@ -443,7 +463,7 @@
                                 showMessage('statusMessage', 'Session connected successfully!', 'success');
                                 document.getElementById('qrcodeContainer').style.display = 'none';
                             }
-                        }, 3000);
+                        }, 2000); // Poll every 2 seconds for faster QR updates
                     } else {
                         showMessage('statusMessage', data.data.message, 'success');
                         loadSessionInfo();
