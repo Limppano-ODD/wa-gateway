@@ -39,6 +39,40 @@ export const createSessionController = () => {
     });
   });
 
+  // Resolve telefone -> LID (identificador de privacidade do WhatsApp). O CRM
+  // usa pra montar o mapa LID->vendedor (mensagens chegam como @lid, sem fone).
+  const resolveLidsSchema = z.object({
+    session: z.string().optional(),
+    phones: z.array(z.string()).min(1).max(500),
+  });
+  app.post(
+    "/resolve-lids",
+    requestValidator("json", resolveLidsSchema),
+    async (c) => {
+      const user = c.get("user") as User;
+      const payload = c.req.valid("json");
+      const sessionName =
+        user.is_admin === 1 && payload.session ? payload.session : user.username;
+      const sock = whatsapp.getSession(sessionName) as any;
+      if (!sock) {
+        throw new HTTPException(400, { message: "Session not connected" });
+      }
+      const jids = payload.phones
+        .map((p) => String(p).replace(/\D/g, ""))
+        .filter((d) => d.length >= 10)
+        .map((d) => `${d}@s.whatsapp.net`);
+      const results = (await sock.onWhatsApp(...jids)) || [];
+      const onlyDigits = (s: any) =>
+        String(s ?? "").split("@")[0].split(":")[0].replace(/\D/g, "");
+      const data = results.map((r: any) => ({
+        phone: onlyDigits(r.jid),
+        lid: r.lid ? onlyDigits(r.lid) : null,
+        exists: !!r.exists,
+      }));
+      return c.json({ data });
+    }
+  );
+
   const startSessionSchema = z.object({
     session: z.string(),
   });
