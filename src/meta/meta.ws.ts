@@ -7,9 +7,9 @@
 
 import { WebSocketServer, type WebSocket } from "ws";
 import type { Server } from "node:http";
-import axios from "axios";
-import { metaConfig, appForToken, routeForNumber } from "./meta.config";
+import { appForToken } from "./meta.config";
 import { metaHub } from "./meta.hub";
+import { relaySend } from "./meta.send";
 
 export function attachMetaWebSocket(server: Server): void {
   // noServer + upgrade manual: o @hono/node-server responde os requests pelo
@@ -76,46 +76,19 @@ async function enviarParaMeta(
   socket: WebSocket,
 ): Promise<void> {
   const { phone_number_id, to, text, ref } = msg;
-  const route = routeForNumber(String(phone_number_id));
-  const responder = (ok: boolean, extra: Record<string, unknown>) => {
-    if (socket.readyState === 1) {
-      socket.send(JSON.stringify({ type: "send_result", ok, ref: ref ?? null, ...extra }));
-    }
-  };
-
-  if (!route?.token) {
-    responder(false, { error: `sem token Meta pro número ${phone_number_id}` });
-    return;
-  }
-  if (!to || !text) {
-    responder(false, { error: "to e text são obrigatórios" });
-    return;
-  }
-
-  try {
-    const uri = `https://graph.facebook.com/${metaConfig.apiVersion}/${phone_number_id}/messages`;
-    const resp = await axios.post(
-      uri,
-      {
-        messaging_product: "whatsapp",
-        to,
-        type: "text",
-        text: { body: text, preview_url: false },
-      },
-      {
-        headers: {
-          Authorization: `Bearer ${route.token}`,
-          "Content-Type": "application/json",
-        },
-      },
+  const r = await relaySend(phone_number_id, to, text);
+  if (socket.readyState === 1) {
+    socket.send(
+      JSON.stringify({
+        type: "send_result",
+        ok: r.ok,
+        ref: ref ?? null,
+        wa_message_id: r.wa_message_id ?? null,
+        error: r.error ?? null,
+      }),
     );
-    const waId = resp.data?.messages?.[0]?.id ?? null;
-    responder(true, { wa_message_id: waId });
-    console.log(`[meta.ws] app "${app}" enviou → ${phone_number_id} → ${to}: ok`);
-  } catch (error: any) {
-    const detail =
-      error?.response?.data?.error?.message || error?.message || "erro desconhecido";
-    responder(false, { error: detail });
-    console.error(`[meta.ws] envio falhou (${phone_number_id} → ${to}):`, detail);
   }
+  console.log(
+    `[meta.ws] app "${app}" enviou → ${phone_number_id} → ${to}: ${r.ok ? "ok" : r.error}`,
+  );
 }

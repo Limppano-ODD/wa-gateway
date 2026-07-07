@@ -11,8 +11,9 @@
 // Envio (SAC → Meta) é feito pela própria ponte WebSocket (type:"send"), ver meta.ws.ts.
 
 import { Hono } from "hono";
-import { metaConfig, routeForNumber } from "./meta.config";
+import { metaConfig, routeForNumber, appForToken } from "./meta.config";
 import { metaHub } from "./meta.hub";
+import { relaySend } from "./meta.send";
 
 export const createMetaController = () => {
   const app = new Hono();
@@ -43,6 +44,36 @@ export const createMetaController = () => {
       console.error("[meta] erro roteando webhook:", e?.message || e);
     }
     return c.text("ok");
+  });
+
+  // --- POST /meta/send → app envia por HTTP (saída; funciona do app interno) ---
+  // Auth pelo token do app (?token= ou header x-app-token). O app só pode enviar
+  // pelos números que são DELE (META_ROUTES[pnid].app === app do token).
+  app.post("/send", async (c) => {
+    const token = c.req.query("token") || c.req.header("x-app-token");
+    const appNome = appForToken(token);
+    if (!appNome) return c.json({ success: false, error: "token inválido" }, 401);
+
+    let body: any;
+    try {
+      body = await c.req.json();
+    } catch {
+      return c.json({ success: false, error: "corpo inválido" }, 400);
+    }
+    const { phone_number_id, to, text } = body || {};
+    const route = routeForNumber(String(phone_number_id));
+    if (!route || route.app !== appNome) {
+      return c.json(
+        { success: false, error: `número ${phone_number_id} não pertence ao app ${appNome}` },
+        403,
+      );
+    }
+
+    const r = await relaySend(phone_number_id, to, text);
+    return c.json(
+      { success: r.ok, wa_message_id: r.wa_message_id ?? null, error: r.error ?? null },
+      r.ok ? 200 : 502,
+    );
   });
 
   // --- GET /meta/status → apps conectados (debug) ---
