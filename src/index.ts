@@ -16,6 +16,7 @@ import { createProfileController } from "./controllers/profile";
 import { serveStatic } from "@hono/node-server/serve-static";
 import { createAdminController } from "./controllers/admin";
 import { createDashboardController } from "./controllers/dashboard";
+import { createMetaController } from "./meta/meta.controller";
 import fs from "fs";
 import path from "path";
 // Initialize database
@@ -87,6 +88,11 @@ app.route("/message", createMessageController());
  * profile routes
  */
 app.route("/profile", createProfileController());
+
+/**
+ * meta cloud api relay routes (webhooks públicos + send)
+ */
+app.route("/meta", createMetaController());
 
 const port = env.PORT;
 
