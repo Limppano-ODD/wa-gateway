@@ -17,6 +17,7 @@ import { serveStatic } from "@hono/node-server/serve-static";
 import { createAdminController } from "./controllers/admin";
 import { createDashboardController } from "./controllers/dashboard";
 import { createMetaController } from "./meta/meta.controller";
+import { attachMetaWebSocket } from "./meta/meta.ws";
 import fs from "fs";
 import path from "path";
 // Initialize database
@@ -96,7 +97,7 @@ app.route("/meta", createMetaController());
 
 const port = env.PORT;
 
-serve(
+const server = serve(
   {
     fetch: app.fetch,
     port,
@@ -105,6 +106,9 @@ serve(
     console.log(`Server is running on http://localhost:${info.port}`);
   }
 );
+
+// Anexa a ponte WebSocket do relay Meta ao mesmo http.Server (path /meta/agent).
+attachMetaWebSocket(server as unknown as import("node:http").Server);
 
 whastapp.onConnected((session) => {
   console.log(`session: '${session}' connected`);
