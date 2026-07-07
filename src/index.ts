@@ -16,8 +16,8 @@ import { createProfileController } from "./controllers/profile";
 import { serveStatic } from "@hono/node-server/serve-static";
 import { createAdminController } from "./controllers/admin";
 import { createDashboardController } from "./controllers/dashboard";
-import { createMetaController } from "./meta/meta.controller";
-import { attachMetaWebSocket } from "./meta/meta.ws";
+import { createBridgeController } from "./bridge/controller";
+import { attachBridgeWebSocket } from "./bridge/ws";
 import fs from "fs";
 import path from "path";
 // Initialize database
@@ -91,9 +91,9 @@ app.route("/message", createMessageController());
 app.route("/profile", createProfileController());
 
 /**
- * meta cloud api relay routes (webhooks públicos + send)
+ * bridge routes — ponte multi-canal (whatsapp, teams...) via /ingress/:tenant
  */
-app.route("/meta", createMetaController());
+app.route("/", createBridgeController());
 
 const port = env.PORT;
 
@@ -107,8 +107,8 @@ const server = serve(
   }
 );
 
-// Anexa a ponte WebSocket do relay Meta ao mesmo http.Server (path /meta/agent).
-attachMetaWebSocket(server as unknown as import("node:http").Server);
+// Anexa a ponte WebSocket genérica ao mesmo http.Server (path /bridge/agent).
+attachBridgeWebSocket(server as unknown as import("node:http").Server);
 
 whastapp.onConnected((session) => {
   console.log(`session: '${session}' connected`);
