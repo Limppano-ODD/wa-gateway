@@ -62,6 +62,8 @@ jobs:
       ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD }}
       DB_PATH: ${{ vars.DB_PATH }}
       PORT: ${{ vars.PORT }}
+      # Bridge multi-canal (contém tokens → secret, não var)
+      BRIDGE_TENANTS: ${{ secrets.BRIDGE_TENANTS }}
     steps:
       - name: Ensure project directory exists and clean
         run: |

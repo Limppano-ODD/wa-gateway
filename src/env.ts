@@ -13,5 +13,10 @@ export const env = z
     ADMIN_USER: z.string(),
     ADMIN_PASSWORD: z.string(),
     DB_PATH: z.string().default("./wa_gateway.db"),
+    // --- Bridge multi-canal (ponte /ingress/:tenant + WebSocket /bridge/agent) ---
+    // Cada tenant = um app/agente interno. JSON: nome -> { wsToken, channel, config }.
+    // channel = "whatsapp" | "teams". config varia por canal (ver src/bridge/config.ts).
+    // Ex: {"sac":{"wsToken":"tok-sac","channel":"whatsapp","config":{"verifyToken":"...","phoneNumberId":"1202...","metaToken":"EAA..."}}}
+    BRIDGE_TENANTS: z.string().default("{}"),
   })
   .parse(process.env);
