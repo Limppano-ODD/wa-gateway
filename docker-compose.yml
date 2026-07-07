@@ -17,6 +17,8 @@ services:
       - ADMIN_USER=${ADMIN_USER}
       - ADMIN_PASSWORD=${ADMIN_PASSWORD}
       - DB_PATH=/app/db/wa_gateway.db
+      # Bridge multi-canal (ponte /ingress/:tenant + /bridge/agent)
+      - BRIDGE_TENANTS=${BRIDGE_TENANTS:-}
     
     volumes:
       # Mount WhatsApp credentials directory
