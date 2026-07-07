@@ -39,6 +39,18 @@ export function attachBridgeWebSocket(server: Server): void {
     bridgeHub.registrar(name, socket);
     socket.send(JSON.stringify({ type: "welcome", tenant: name }));
 
+    // Keepalive: ping a cada 30s pra não deixar o ALB derrubar a conexão idle
+    // (idle timeout ~60s). Sem isso a ponte cai/reconecta e mensagem no gap se perde.
+    const pingTimer = setInterval(() => {
+      if (socket.readyState === 1) {
+        try {
+          socket.ping();
+        } catch {
+          /* socket morrendo — o close handler limpa */
+        }
+      }
+    }, 30_000);
+
     socket.on("message", (raw) => {
       let msg: any;
       try {
@@ -49,8 +61,12 @@ export function attachBridgeWebSocket(server: Server): void {
       if (msg?.type === "send") void enviar(name, msg, socket);
     });
 
-    socket.on("close", () => bridgeHub.remover(name, socket));
-    socket.on("error", () => bridgeHub.remover(name, socket));
+    const cleanup = () => {
+      clearInterval(pingTimer);
+      bridgeHub.remover(name, socket);
+    };
+    socket.on("close", cleanup);
+    socket.on("error", cleanup);
   });
 
   console.log("[bridge.ws] ponte WebSocket em /bridge/agent");
