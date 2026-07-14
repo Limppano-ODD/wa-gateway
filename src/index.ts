@@ -240,12 +240,6 @@ whastapp.onMessageReceived(async (message: MessageReceived) => {
       message.message?.locationMessage?.comment ||
       message.message?.liveLocationMessage?.caption ||
       null,
-    media: {
-      image: null, // TODO: implement media handling
-      video: null,
-      document: null,
-      audio: null,
-    },
   };
   console.log(body);
   
