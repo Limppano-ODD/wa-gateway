@@ -156,18 +156,78 @@ export const teamsAdapter: ChannelAdapter = {
     try {
       const accessToken = await getBotToken(tenant);
       const uri = activitiesUri(serviceUrl, conversationId);
-      const resp = await axios.post(
-        uri,
-        { type: "message", text },
-        { headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" } },
-      );
-      return { ok: true, id: resp.data?.id ?? null };
+
+      // Resposta longa vira VÁRIAS mensagens. O Teams recusa activity acima do
+      // limite dele, e uma lista ("me liste os vendedores do RJ") passa fácil.
+      // Antes ia num POST só: estourava, a entrega falhava, e a pessoa ficava
+      // sem NENHUMA resposta — o agente já tinha respondido do lado de cá.
+      const partes = partirTexto(String(text ?? ""));
+      let ultimoId: string | null = null;
+      for (const parte of partes) {
+        const resp = await postarComRetry(uri, accessToken, parte);
+        ultimoId = resp?.data?.id ?? ultimoId;
+      }
+      return { ok: true, id: ultimoId };
     } catch (error: any) {
       const detail = error?.response?.data?.error?.message || error?.message || "erro desconhecido";
       return { ok: false, error: detail };
     }
   },
 };
+
+// Teto por mensagem. O limite duro do Teams é maior, mas margem folgada evita
+// ficar na fronteira por causa de emoji/acento (o limite é em bytes, não chars).
+const LIMITE_MSG = 3500;
+
+// partirTexto quebra em pedaços preferindo cortar em parágrafo, depois em linha,
+// e só então no meio do texto. Cortar em qualquer posição partiria tabela e
+// lista no meio, que é justamente o formato de resposta longa que o agente usa.
+export function partirTexto(texto: string, limite = LIMITE_MSG): string[] {
+  if (texto.length <= limite) return [texto || "(sem resposta)"];
+  const partes: string[] = [];
+  let resto = texto;
+  while (resto.length > limite) {
+    const janela = resto.slice(0, limite);
+    let corte = janela.lastIndexOf("\n\n");
+    if (corte < limite * 0.5) corte = janela.lastIndexOf("\n");
+    if (corte < limite * 0.5) corte = janela.lastIndexOf(" ");
+    if (corte <= 0) corte = limite;
+    partes.push(resto.slice(0, corte).trimEnd());
+    resto = resto.slice(corte).trimStart();
+  }
+  if (resto) partes.push(resto);
+  return partes;
+}
+
+// postarComRetry tenta de novo em falha de REDE (ECONNRESET, timeout, 5xx).
+//
+// Foi o que aconteceu em 05/08: o agente respondeu, o POST pro Bot Framework
+// morreu com ECONNRESET, e a pessoa não recebeu nada — sem retry e sem aviso, um
+// soluço de rede vira silêncio. Erro de 4xx NÃO é retentado: se a requisição
+// está errada, repetir não conserta.
+async function postarComRetry(uri: string, accessToken: string, text: string, tentativas = 3) {
+  let ultimoErro: any;
+  for (let i = 1; i <= tentativas; i++) {
+    try {
+      return await axios.post(
+        uri,
+        { type: "message", text },
+        {
+          headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" },
+          timeout: 20_000,
+        },
+      );
+    } catch (e: any) {
+      ultimoErro = e;
+      const status = e?.response?.status;
+      const ehRede = !status || status >= 500 || status === 429;
+      if (!ehRede || i === tentativas) throw e;
+      console.warn(`[teams] envio falhou (${e?.code || status}) — tentativa ${i}/${tentativas}`);
+      await new Promise((r) => setTimeout(r, 400 * i)); // recuo progressivo
+    }
+  }
+  throw ultimoErro;
+}
 
 // activitiesUri monta a URL pra postar uma activity numa conversa.
 function activitiesUri(serviceUrl: string, conversationId: string): string {
