@@ -1,5 +1,8 @@
 # Multi-stage build for WhatsApp Gateway
-FROM node:20-alpine AS base
+# Node 22: o pnpm 11 (fixado no packageManager) usa módulo builtin que não
+# existe no Node 20 — o build da imagem quebrava com ERR_UNKNOWN_BUILTIN_MODULE.
+# Casado com o node-version do CI.
+FROM node:22-alpine AS base
 
 # Install pnpm
 # Versão FIXA: `npm i -g pnpm` pega a latest, então dois builds em datas
