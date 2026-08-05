@@ -42,6 +42,32 @@ class BridgeHub {
     return n;
   }
 
+  // Fecha todas as pontes abertas de um app. Usado quando a credencial dele é
+  // trocada ou o tenant é removido: sem isso a conexão autenticada com o token
+  // ANTIGO continua aberta e recebendo mensagens até o processo reiniciar —
+  // revogar deixaria de revogar de fato. Retorna quantas foram fechadas.
+  derrubar(app: string, motivo: string): number {
+    const set = this.conexoes.get(app);
+    if (!set || set.size === 0) return 0;
+    let n = 0;
+    for (const socket of [...set]) {
+      try {
+        socket.close(4003, motivo);
+      } catch {
+        try {
+          socket.terminate();
+        } catch {
+          /* já morto */
+        }
+      }
+      n++;
+    }
+    // Não espera o handler de 'close': quem foi derrubado sai do registro agora.
+    this.conexoes.delete(app);
+    console.log(`[bridge.hub] app "${app}": ${n} ponte(s) derrubada(s) — ${motivo}`);
+    return n;
+  }
+
   status(): Record<string, number> {
     const out: Record<string, number> = {};
     for (const [app, set] of this.conexoes) out[app] = set.size;

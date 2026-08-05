@@ -19,6 +19,13 @@ services:
       - DB_PATH=/app/db/wa_gateway.db
       # Bridge multi-canal (ponte /ingress/:tenant + /bridge/agent)
       - BRIDGE_TENANTS=${BRIDGE_TENANTS:-}
+      # Autoriza a plataforma de agentes a REGISTRAR tenant em runtime
+      # (PUT /bridge/tenants/<nome>), sem reiniciar este processo — reiniciar
+      # derruba a ponte de todos os bots que estão no ar. Tem que ser o mesmo
+      # valor configurado como BRIDGE_ADMIN_TOKEN no control-plane.
+      # Vazio = rotas de registro desligadas (fail-closed); só vale o
+      # BRIDGE_TENANTS do env, como era antes.
+      - BRIDGE_ADMIN_TOKEN=${BRIDGE_ADMIN_TOKEN:-}
     
     volumes:
       # Mount WhatsApp credentials directory

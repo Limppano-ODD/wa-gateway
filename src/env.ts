@@ -18,5 +18,10 @@ export const env = z
     // channel = "whatsapp" | "teams". config varia por canal (ver src/bridge/config.ts).
     // Ex: {"sac":{"wsToken":"tok-sac","channel":"whatsapp","config":{"verifyToken":"...","phoneNumberId":"1202...","metaToken":"EAA..."}}}
     BRIDGE_TENANTS: z.string().default("{}"),
+    // Token que autoriza CRIAR/REMOVER tenant em runtime (rotas
+    // /bridge/tenants/*). Quem chama é o control-plane da plataforma de agentes,
+    // ao provisionar um bot novo. VAZIO = rotas desligadas (fail-closed): sem
+    // token não existe registro em runtime, só o que vem do BRIDGE_TENANTS.
+    BRIDGE_ADMIN_TOKEN: z.string().default(""),
   })
   .parse(process.env);

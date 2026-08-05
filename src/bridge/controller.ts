@@ -8,10 +8,36 @@
 //
 // Roteia pelo :tenant (config diz qual canal) — adicionar app/canal = só config.
 
+import { timingSafeEqual } from "node:crypto";
 import { Hono } from "hono";
-import { tenant as tenantDef, tenantByWsToken } from "./config";
+import {
+  listarTenants,
+  origemDoTenant,
+  registrarTenant,
+  removerTenant,
+  tenant as tenantDef,
+  tenantByWsToken,
+} from "./config";
 import { adapterFor } from "./channels";
 import { bridgeHub } from "./hub";
+import { env } from "../env";
+
+// Guarda das rotas de administração de tenant. Fail-closed: sem
+// BRIDGE_ADMIN_TOKEN configurado a rota não existe pra ninguém.
+function adminAutorizado(c: any): { ok: true } | { ok: false; status: number; erro: string } {
+  const esperado = env.BRIDGE_ADMIN_TOKEN;
+  if (!esperado) {
+    return { ok: false, status: 503, erro: "registro de tenant em runtime desabilitado (BRIDGE_ADMIN_TOKEN não configurado)" };
+  }
+  const bearer = (c.req.header("authorization") || "").replace(/^Bearer\s+/i, "");
+  const recebido = bearer || c.req.header("x-bridge-admin-token") || "";
+  const a = Buffer.from(recebido);
+  const b = Buffer.from(esperado);
+  if (a.length !== b.length || !timingSafeEqual(a, b)) {
+    return { ok: false, status: 401, erro: "token inválido" };
+  }
+  return { ok: true };
+}
 
 export const createBridgeController = () => {
   const app = new Hono();
@@ -40,10 +66,37 @@ export const createBridgeController = () => {
     const headers: Record<string, string> = {};
     c.req.raw.headers.forEach((v, k) => (headers[k] = v));
 
-    // Responde 200 rápido; processa/empurra em background (webhooks têm timeout).
-    processarEntrada(adapter, rawBody, headers, t, name).catch((e) =>
-      console.error(`[bridge] erro processando entrada de ${name}:`, e?.message || e),
-    );
+    // receive() é rápido (valida/parseia); o trabalho pesado (o agente) roda do
+    // outro lado da ponte. Alguns eventos exigem uma resposta HTTP específica
+    // (ex: Teams fileConsent/invoke → InvokeResponse) — por isso aguardamos aqui.
+    let result: Awaited<ReturnType<typeof adapter.receive>> = null;
+    try {
+      result = await adapter.receive(rawBody, headers, t);
+    } catch (e: any) {
+      console.error(`[bridge] erro processando entrada de ${name}:`, e?.message || e);
+      return c.text("ok"); // não vaza erro pro canal
+    }
+
+    if (result?.response) {
+      const r = result.response;
+      if (r.json !== undefined) return c.json(r.json as any, r.status as any);
+      return c.body(r.body ?? "", r.status as any);
+    }
+    if (result?.push) {
+      // Entrega protegida: antes isto rodava em background com .catch(), então
+      // exceção aqui NUNCA podia afetar a resposta HTTP. Ao trazer pro caminho
+      // síncrono (necessário pro InvokeResponse do Teams), uma exceção subiria
+      // pro middleware de erro e devolveria 500 ao webhook — e 500 pra Meta
+      // significa RETRY, ou seja, mensagem de WhatsApp entregue duas vezes ao
+      // app e possivelmente resposta duplicada pro cliente. O canal já recebeu a
+      // mensagem; falha na ponte é problema nosso, não motivo pra pedir reenvio.
+      try {
+        const n = bridgeHub.entregar(name, { type: "message", ...(result.push as object) });
+        console.log(`[bridge] ${adapter.name} → tenant "${name}" (${n} ponte(s))`);
+      } catch (e: any) {
+        console.error(`[bridge] falha entregando na ponte de ${name}:`, e?.message || e);
+      }
+    }
     return c.text("ok");
   });
 
@@ -72,19 +125,63 @@ export const createBridgeController = () => {
   // GET /bridge/status
   app.get("/bridge/status", (c) => c.json({ tenants_online: bridgeHub.status() }));
 
+  // ── Administração de tenants em RUNTIME ────────────────────────────────────
+  // Quem chama é o control-plane da plataforma de agentes, ao provisionar um bot.
+  // Antes disso, um bot novo só passava a existir editando BRIDGE_TENANTS e
+  // REINICIANDO o gateway — o que derruba a ponte de todos os bots no ar.
+
+  // GET /bridge/tenants — nome, canal e origem. Sem segredo no corpo.
+  app.get("/bridge/tenants", (c) => {
+    const auth = adminAutorizado(c);
+    if (!auth.ok) return c.json({ success: false, error: auth.erro }, auth.status as any);
+    return c.json({ success: true, tenants: listarTenants(), online: bridgeHub.status() });
+  });
+
+  // PUT /bridge/tenants/:name — cria ou atualiza. Idempotente.
+  app.put("/bridge/tenants/:name", async (c) => {
+    const auth = adminAutorizado(c);
+    if (!auth.ok) return c.json({ success: false, error: auth.erro }, auth.status as any);
+
+    const name = c.req.param("name");
+    let body: any;
+    try {
+      body = await c.req.json();
+    } catch {
+      return c.json({ success: false, error: "corpo inválido (esperado JSON)" }, 400);
+    }
+    const r = registrarTenant(name, body?.channel, body?.wsToken, body?.config || {});
+    if (!r.ok) return c.json({ success: false, error: r.erro }, r.status as any);
+    return c.json({ success: true, name, criado: r.criado === true }, r.status as any);
+  });
+
+  // DELETE /bridge/tenants/:name
+  app.delete("/bridge/tenants/:name", (c) => {
+    const auth = adminAutorizado(c);
+    if (!auth.ok) return c.json({ success: false, error: auth.erro }, auth.status as any);
+
+    const name = c.req.param("name");
+    const r = removerTenant(name);
+    if (!r.ok) return c.json({ success: false, error: r.erro }, r.status as any);
+    return c.json({ success: true, name });
+  });
+
+  // GET /bridge/tenants/:name — existe? de onde vem? está online?
+  app.get("/bridge/tenants/:name", (c) => {
+    const auth = adminAutorizado(c);
+    if (!auth.ok) return c.json({ success: false, error: auth.erro }, auth.status as any);
+
+    const name = c.req.param("name");
+    const origem = origemDoTenant(name);
+    if (!origem) return c.json({ success: false, error: "tenant não encontrado" }, 404);
+    const t = tenantDef(name)!;
+    return c.json({
+      success: true,
+      name,
+      channel: t.channel,
+      origem,
+      pontes: bridgeHub.status()[name] || 0,
+    });
+  });
+
   return app;
 };
-
-async function processarEntrada(
-  adapter: ReturnType<typeof adapterFor>,
-  rawBody: string,
-  headers: Record<string, string>,
-  t: ReturnType<typeof tenantDef>,
-  name: string,
-): Promise<void> {
-  if (!adapter || !t) return;
-  const result = await adapter.receive(rawBody, headers, t);
-  if (!result?.push) return;
-  const n = bridgeHub.entregar(name, { type: "message", ...(result.push as object) });
-  console.log(`[bridge] ${adapter.name} → tenant "${name}" (${n} ponte(s))`);
-}

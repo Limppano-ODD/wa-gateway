@@ -39,19 +39,44 @@ export const whatsappAdapter: ChannelAdapter = {
     return { push: { source: "whatsapp", entry: payload.entry ?? [] } };
   },
 
+  // Envia texto OU botões interativos. payload:
+  //   { to, text }                                  → mensagem de texto
+  //   { to, interactive: { body, buttons:[{id,title}] } } → botões clicáveis (máx 3)
   async send(payload: Record<string, any>, tenant: TenantDef): Promise<SendResult> {
-    const { to, text } = payload;
+    const { to, text, interactive } = payload;
     const { phoneNumberId, metaToken } = tenant.config;
     const apiVersion = tenant.config.apiVersion || "v20.0";
     if (!metaToken || !phoneNumberId) return { ok: false, error: "tenant whatsapp sem metaToken/phoneNumberId" };
-    if (!to || !text) return { ok: false, error: "to e text obrigatórios" };
+    if (!to) return { ok: false, error: "to obrigatório" };
+
+    let body: Record<string, any>;
+    if (interactive && Array.isArray(interactive.buttons) && interactive.buttons.length) {
+      body = {
+        messaging_product: "whatsapp",
+        to,
+        type: "interactive",
+        interactive: {
+          type: "button",
+          body: { text: String(interactive.body || "").slice(0, 1024) },
+          action: {
+            buttons: interactive.buttons.slice(0, 3).map((b: any) => ({
+              type: "reply",
+              reply: { id: String(b.id).slice(0, 256), title: String(b.title).slice(0, 20) },
+            })),
+          },
+        },
+      };
+    } else if (text) {
+      body = { messaging_product: "whatsapp", to, type: "text", text: { body: text, preview_url: false } };
+    } else {
+      return { ok: false, error: "text ou interactive obrigatório" };
+    }
+
     try {
       const uri = `https://graph.facebook.com/${apiVersion}/${phoneNumberId}/messages`;
-      const resp = await axios.post(
-        uri,
-        { messaging_product: "whatsapp", to, type: "text", text: { body: text, preview_url: false } },
-        { headers: { Authorization: `Bearer ${metaToken}`, "Content-Type": "application/json" } },
-      );
+      const resp = await axios.post(uri, body, {
+        headers: { Authorization: `Bearer ${metaToken}`, "Content-Type": "application/json" },
+      });
       return { ok: true, id: resp.data?.messages?.[0]?.id ?? null };
     } catch (error: any) {
       const detail = error?.response?.data?.error?.message || error?.message || "erro desconhecido";
