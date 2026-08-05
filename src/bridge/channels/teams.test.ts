@@ -27,6 +27,6 @@ test("corta em parágrafo quando dá, pra não partir tabela no meio", () => {
   const texto = "bloco um".padEnd(300, ".") + "\n\n" + "bloco dois".padEnd(300, ".");
   const partes = partirTexto(texto, 400);
   assert.equal(partes.length, 2);
-  assert.ok(partes[0].startsWith("bloco um"));
-  assert.ok(partes[1].startsWith("bloco dois"));
+  assert.ok(partes[0]?.startsWith("bloco um"));
+  assert.ok(partes[1]?.startsWith("bloco dois"));
 });
