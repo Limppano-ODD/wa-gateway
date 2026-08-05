@@ -2,7 +2,11 @@
 FROM node:20-alpine AS base
 
 # Install pnpm
-RUN npm install -g pnpm
+# Versão FIXA: `npm i -g pnpm` pega a latest, então dois builds em datas
+# diferentes podiam resolver dependências de formas diferentes — foi assim que o
+# audio-decode saiu do lockfile sem ninguém decidir. Casada com o
+# `packageManager` do package.json.
+RUN npm install -g pnpm@11.1.3
 
 # Build stage
 FROM base AS builder

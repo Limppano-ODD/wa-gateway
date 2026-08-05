@@ -14,6 +14,10 @@ export interface VerifyResult {
 export interface IngestResult {
   // objeto a empurrar pro agente pela ponte (ou undefined pra ignorar).
   push?: unknown;
+  // resposta HTTP que a rota /ingress deve devolver ao canal (ex: Teams exige
+  // um InvokeResponse pro fileConsent/invoke, senão mostra "ação não suportada").
+  // Se presente, a rota devolve isso em vez do "ok" padrão.
+  response?: { status: number; json?: unknown; body?: string };
 }
 
 export interface SendResult {

@@ -64,6 +64,12 @@ jobs:
       PORT: ${{ vars.PORT }}
       # Bridge multi-canal (contém tokens → secret, não var)
       BRIDGE_TENANTS: ${{ secrets.BRIDGE_TENANTS }}
+      # Token que a plataforma de agentes usa pra REGISTRAR o tenant de um bot
+      # novo em runtime (PUT /bridge/tenants/<nome>), sem reiniciar este serviço.
+      # Reiniciar derruba a ponte de todos os bots no ar — era o que tornava
+      # "criar bot em prd" impossível de fazer sem incomodar quem já usa.
+      # Precisa ser o MESMO valor do BRIDGE_ADMIN_TOKEN do agent-platform.
+      BRIDGE_ADMIN_TOKEN: ${{ secrets.BRIDGE_ADMIN_TOKEN }}
     steps:
       - name: Ensure project directory exists and clean
         run: |

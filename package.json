@@ -1,9 +1,11 @@
 {
   "name": "wa-gateway",
   "version": "4.3.2",
+  "packageManager": "pnpm@11.1.3",
   "scripts": {
     "dev": "tsx watch src/index.ts",
-    "start": "tsx src/index.ts"
+    "start": "tsx src/index.ts",
+    "test": "tsx --test src/**/*.test.ts"
   },
   "author": {
     "name": "mimamch",
@@ -40,6 +42,7 @@
   },
   "devDependencies": {
     "@types/node": "^22.10.1",
-    "@types/qrcode": "^1.5.5"
+    "@types/qrcode": "^1.5.5",
+    "@types/ws": "^8.5.12"
   }
 }

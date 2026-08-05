@@ -1,0 +1,41 @@
+name: CI
+
+# O repo tinha deploy (deploy.yml) mas nenhuma verificação antes dele: os testes
+# da ponte só rodavam na máquina de quem escreveu. Num serviço que atende
+# WhatsApp de cliente, "passou aqui" não pode ser a garantia.
+on:
+  pull_request:
+  push:
+    branches: [master, hml]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # Sem `version:` de propósito — a action lê o campo `packageManager` do
+      # package.json. Assim CI, Docker e máquina local usam o MESMO pnpm, e o
+      # lockfile para de mudar de forma dependendo de quem rodou o install.
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      # --frozen-lockfile: falha se o pnpm-lock.yaml não bater com o
+      # package.json. É o que impede uma resolução diferente de dependência
+      # entrar em produção sem ninguém ter decidido isso — foi assim que o
+      # audio-decode (peer opcional do Baileys) sumiu do lockfile sem intenção.
+      - name: Instalar dependências
+        run: pnpm install --frozen-lockfile
+
+      - name: Testes
+        run: pnpm test
+
+      # Só os módulos da ponte: o resto do repo é código herdado do upstream
+      # (mimamch/wa-gateway) e tem erros de tipo pré-existentes que não são
+      # nossos pra corrigir agora. Travar o que é nosso já evita regressão.
+      - name: Typecheck dos módulos da ponte
+        run: pnpm exec tsc --noEmit -p . 2>&1 | (! grep -E "src/bridge/|src/env\.ts")
