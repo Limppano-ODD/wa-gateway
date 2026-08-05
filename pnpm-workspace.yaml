@@ -1,3 +1,18 @@
+# Pacotes autorizados a rodar script de build (compilação nativa).
+#
+# `allowBuilds` é a chave do pnpm 10+; `onlyBuiltDependencies` é a antiga e fica
+# pra quem rodar com pnpm 9. Sem a nova, o pnpm 11 ABORTA o install com
+# ERR_PNPM_IGNORED_BUILDS em vez de só avisar — o que quebra o build da imagem,
+# não só o CI.
+#
+# Todos aqui precisam compilar de verdade: bcrypt e better-sqlite3 são nativos,
+# esbuild baixa binário, protobufjs e baileys têm postinstall.
+allowBuilds:
+  '@whiskeysockets/baileys': true
+  bcrypt: true
+  better-sqlite3: true
+  esbuild: true
+  protobufjs: true
 onlyBuiltDependencies:
   - '@whiskeysockets/baileys'
   - bcrypt
