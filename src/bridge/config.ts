@@ -33,7 +33,7 @@
 
 import { timingSafeEqual } from "node:crypto";
 import { env } from "../env";
-import { tenantStore } from "./store";
+import { storeDisponivel, tenantStore } from "./store";
 import { bridgeHub } from "./hub";
 
 export interface TenantDef {
@@ -48,11 +48,34 @@ export type Origem = "env" | "runtime";
 // nome com "/", ".." ou espaço produza rota estranha ou log confuso.
 const NOME_VALIDO = /^[a-z0-9][a-z0-9._-]{1,62}$/;
 
+// Teto de tenants criados em runtime. Guarda-corpo contra laço com bug ou token
+// comprometido enchendo a tabela — não é limite de negócio.
+const MAX_TENANTS_RUNTIME = 200;
+
 // Campos que cada canal precisa ter pra funcionar. Validar no registro impede
 // gravar um tenant que só falharia na primeira mensagem real.
 const OBRIGATORIOS: Record<string, string[]> = {
   teams: ["appId", "appPassword", "tenantId"],
   whatsapp: ["verifyToken", "phoneNumberId", "metaToken"],
+};
+
+// Campo que IDENTIFICA de quem é o tenant, por canal. Um tenant pertence a UMA
+// identidade: no Teams, ao app registration (appId); no WhatsApp, ao número
+// (phoneNumberId).
+//
+// Serve pra distinguir dois casos que o PUT idempotente confundia:
+//
+//   mesma identidade  → é o MESMO bot repetindo o registro (retry de rede, ou
+//                       rotação de segredo). Legítimo, atualiza.
+//   identidade outra  → é OUTRO bot tentando ocupar um nome de tenant que já
+//                       tem dono. Recusa.
+//
+// Sem isso, criar um bot novo com o nome de tenant de um bot existente
+// sobrescrevia as credenciais dele e derrubava a conexão viva: o bot antigo
+// emudecia em produção e a criação do novo reportava sucesso.
+const IDENTIDADE: Record<string, string> = {
+  teams: "appId",
+  whatsapp: "phoneNumberId",
 };
 
 function parseEnvTenants(): Record<string, TenantDef> {
@@ -139,20 +162,48 @@ export function registrarTenant(
   wsToken: string,
   config: Record<string, any>,
 ): ResultadoRegistro {
-  if (!name || !NOME_VALIDO.test(name)) {
+  // Sem a tabela, registrar em runtime não é possível — responde 503 explícito em
+  // vez de estourar no INSERT e virar 500.
+  if (!storeDisponivel()) {
+    return { ok: false, status: 503, erro: "armazenamento de tenants indisponível (ver log do boot)" };
+  }
+  if (typeof name !== "string" || !NOME_VALIDO.test(name)) {
     return { ok: false, status: 400, erro: "nome inválido (use a-z, 0-9, . _ -, 2 a 63 chars)" };
+  }
+  // Teto no número de tenants de runtime: sem isso um token comprometido (ou um
+  // laço com bug do lado do control-plane) enche a tabela e o Map em memória
+  // indefinidamente. O número é folgado — a Limppano tem 10 empresas.
+  if (runtimeTenants.size >= MAX_TENANTS_RUNTIME && !runtimeTenants.has(name)) {
+    return {
+      ok: false,
+      status: 507,
+      erro: `limite de ${MAX_TENANTS_RUNTIME} tenants de runtime atingido — remova algum antes de criar outro`,
+    };
   }
   if (envTenants[name]) {
     // 409 e não 403: o nome existe, só não é gravável por aqui.
     return { ok: false, status: 409, erro: `tenant "${name}" vem do env e não pode ser alterado em runtime` };
   }
-  if (!channel || !OBRIGATORIOS[channel]) {
+  // Object.hasOwn e não `!OBRIGATORIOS[channel]`: a chave vem do corpo da
+  // requisição, e `OBRIGATORIOS["__proto__"]` ou `["constructor"]` resolve pela
+  // cadeia de protótipo pra algo truthy — a checagem de "canal desconhecido"
+  // não disparava. Hoje o efeito era só um 500 na linha seguinte (Object não
+  // tem .filter), mas depender de um crash acidental pra barrar entrada não é
+  // barreira. (CWE-1321)
+  if (!channel || !Object.hasOwn(OBRIGATORIOS, channel)) {
     return { ok: false, status: 400, erro: `canal desconhecido: ${channel || "(vazio)"}` };
   }
-  if (!wsToken || wsToken.length < 16) {
-    return { ok: false, status: 400, erro: "wsToken ausente ou curto demais (mínimo 16 chars)" };
+  // typeof antes de .length: se wsToken vier como número no JSON, `.length` é
+  // undefined e `undefined < 16` é false — a validação PASSAVA com um valor que
+  // não é string, e o erro só aparecia depois, no bind do sqlite, como 500.
+  if (typeof wsToken !== "string" || wsToken.length < 16) {
+    return { ok: false, status: 400, erro: "wsToken ausente, não-texto, ou curto demais (mínimo 16 chars)" };
   }
-  const faltando = OBRIGATORIOS[channel].filter((k) => !config?.[k]);
+  if (!config || typeof config !== "object" || Array.isArray(config)) {
+    return { ok: false, status: 400, erro: "config precisa ser um objeto" };
+  }
+  const obrigatorios = OBRIGATORIOS[channel] ?? [];
+  const faltando = obrigatorios.filter((k) => typeof config[k] !== "string" || !config[k]);
   if (faltando.length) {
     return { ok: false, status: 400, erro: `config do canal ${channel} sem: ${faltando.join(", ")}` };
   }
@@ -166,6 +217,27 @@ export function registrarTenant(
   }
 
   const anterior = runtimeTenants.get(name);
+
+  // O tenant já existe: só o MESMO dono pode reescrever. Outro bot tentando
+  // ocupar o nome é recusado, não atendido silenciosamente.
+  if (anterior) {
+    if (anterior.channel !== channel) {
+      return { ok: false, status: 409, erro: `tenant "${name}" já existe no canal ${anterior.channel}` };
+    }
+    const campo = IDENTIDADE[channel];
+    const donoAtual = campo ? anterior.config?.[campo] : undefined;
+    const donoNovo = campo ? config?.[campo] : undefined;
+    if (campo && donoAtual && donoAtual !== donoNovo) {
+      return {
+        ok: false,
+        status: 409,
+        erro:
+          `tenant "${name}" já pertence a outro ${campo} (${donoAtual}) — ` +
+          `sobrescrever derrubaria a ponte dele. Use outro nome de tenant.`,
+      };
+    }
+  }
+
   tenantStore.gravar(name, channel, wsToken, config);
   runtimeTenants.set(name, { wsToken, channel, config });
 

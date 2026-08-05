@@ -120,6 +120,45 @@ test("recusa wsToken curto", () => {
   assert.equal(r.status, 400);
 });
 
+test("NÃO deixa OUTRO bot ocupar um nome de tenant que já tem dono", () => {
+  // Simula a conexão viva do bot que já é dono do nome.
+  let fechado = false;
+  const fake: any = { readyState: 1, close: () => (fechado = true), terminate: () => {}, send: () => {} };
+  hub.bridgeHub.registrar("bot-diretoria", fake);
+
+  // Outro appId = outro bot. Antes isto sobrescrevia as credenciais do dono e
+  // derrubava a ponte dele, e a criação reportava sucesso.
+  const r = cfg.registrarTenant("bot-diretoria", "teams", "tok-do-invasor-1234567890", {
+    appId: "OUTRO-APP",
+    appPassword: "p",
+    tenantId: "t",
+  });
+  assert.equal(r.ok, false);
+  assert.equal(r.status, 409);
+  assert.match(r.erro!, /já pertence a outro appId/);
+  assert.equal(fechado, false, "derrubou a ponte do dono legítimo");
+  // o dono segue com o token dele funcionando
+  assert.equal(cfg.tenantByWsToken(TOK_BOT), "bot-diretoria");
+  assert.equal(cfg.tenantByWsToken("tok-do-invasor-1234567890"), null);
+  hub.bridgeHub.remover("bot-diretoria", fake);
+});
+
+test("MESMO bot (mesmo appId) pode reescrever — é retry/rotação", () => {
+  const r = cfg.registrarTenant("bot-diretoria", "teams", TOK_BOT, { ...teams, appPassword: "senha-rotacionada" });
+  assert.equal(r.ok, true);
+  assert.equal(cfg.tenant("bot-diretoria")?.config.appPassword, "senha-rotacionada");
+});
+
+test("NÃO deixa trocar o canal de um tenant existente", () => {
+  const r = cfg.registrarTenant("bot-diretoria", "whatsapp", TOK_BOT, {
+    verifyToken: "v",
+    phoneNumberId: "1",
+    metaToken: "m",
+  });
+  assert.equal(r.ok, false);
+  assert.equal(r.status, 409);
+});
+
 test("trocar o wsToken derruba a conexão autenticada com o antigo", () => {
   // Socket de mentira: só precisa de close() e readyState pro hub.
   let fechado = false;
@@ -157,6 +196,45 @@ test("sobrevive a restart: recarrega do banco", () => {
   cfg._recarregar(); // simula o boot lendo a tabela
   assert.equal(cfg.tenant("bot-persistente")?.channel, "teams");
   assert.equal(cfg.tenantByWsToken("tok-persistente-1234567890"), "bot-persistente");
+});
+
+test("canal com nome de propriedade do protótipo é recusado", () => {
+  // `OBRIGATORIOS["__proto__"]` resolve pela cadeia de protótipo e é truthy, então
+  // a checagem de canal desconhecido não disparava — barrava só por acidente,
+  // porque a linha seguinte estourava. Agora recusa de propósito.
+  for (const canal of ["__proto__", "constructor", "toString", "valueOf"]) {
+    const r = cfg.registrarTenant("bot-proto", canal, "tok-proto-1234567890abcd", teams);
+    assert.equal(r.ok, false, `aceitou canal ${canal}`);
+    assert.equal(r.status, 400);
+  }
+  assert.equal(cfg.tenant("bot-proto"), null);
+});
+
+test("wsToken não-texto é recusado com 400, não 500", () => {
+  // Número no JSON: `.length` é undefined e `undefined < 16` é false — passava a
+  // validação e só falhava depois, no bind do sqlite.
+  const r = cfg.registrarTenant("bot-numerico", "teams", 12345678901234567890 as any, teams);
+  assert.equal(r.ok, false);
+  assert.equal(r.status, 400);
+  assert.equal(cfg.tenant("bot-numerico"), null);
+});
+
+test("config não-objeto é recusada", () => {
+  for (const c of [null, "texto", 42, ["a"]] as any[]) {
+    const r = cfg.registrarTenant("bot-cfg", "teams", "tok-cfg-1234567890abcdef", c);
+    assert.equal(r.ok, false);
+    assert.equal(r.status, 400);
+  }
+});
+
+test("campo de config não-texto conta como faltando", () => {
+  const r = cfg.registrarTenant("bot-cfg2", "teams", "tok-cfg2-1234567890abcde", {
+    appId: 123,
+    appPassword: "p",
+    tenantId: "t",
+  } as any);
+  assert.equal(r.ok, false);
+  assert.match(r.erro!, /appId/);
 });
 
 test("listagem não vaza wsToken nem segredo de canal", () => {
