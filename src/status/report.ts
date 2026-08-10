@@ -16,13 +16,24 @@ export type SessionStatus = {
   credentials_present: boolean;
   hours_without_message: number | null;
   /**
-   * Há quantas horas a sessão está fora. `null` quando conectada — assim o
-   * campo nunca precisa ser lido junto com `connected` para fazer sentido.
+   * Há quantas horas a sessão está fora. **`0` quando conectada** — não é
+   * eufemismo, é literal: está fora há zero horas.
    *
-   * Sai de `last_state_change_at`, que vive no sqlite e portanto sobrevive a
-   * restart do container: reiniciar o processo não zera o relógio da queda.
-   * `null` também quando a sessão nunca teve evento registrado (cadastrada mas
-   * nunca pareada) — inventar "0 horas" ali seria mentir.
+   * Ser sempre um número no caso saudável é o que permite ao Gatus checar
+   * `[BODY].hours_disconnected == 0`. Quando a condição falha, o Gatus
+   * substitui o valor real na mensagem do alerta:
+   *
+   *   [BODY].hours_disconnected (12.4) == 0
+   *
+   * Ou seja, o alerta já chega dizendo há quanto tempo caiu, sem ninguém
+   * precisar abrir o painel. Com `null` no caso saudável a condição ficaria
+   * permanentemente vermelha e essa porta se fecharia.
+   *
+   * `null` fica reservado para o caso em que realmente não se sabe: sessão
+   * fora que nunca teve evento registrado (cadastrada mas nunca pareada).
+   *
+   * Sai de `last_state_change_at`, que vive no sqlite — reiniciar o container
+   * não zera o relógio da queda.
    */
   hours_disconnected: number | null;
   disconnected_since: string | null;
@@ -96,11 +107,16 @@ export function buildSessionStatus(
     hours_without_message: lastMessage
       ? hoursBetween(lastMessage, deps.now())
       : null,
-    // "Qual caiu" vem do nome; "há quanto tempo" vem daqui. Número puro, pelo
-    // mesmo motivo de hours_without_message: quem decide o que é grave é o
-    // monitoramento. `null` quando conectada, e também quando a sessão nunca
-    // teve evento — inventar 0 ali seria dizer "acabou de cair".
-    hours_disconnected: downSince ? hoursBetween(downSince, deps.now()) : null,
+    // "Qual caiu" vem do nome do monitor; "há quanto tempo" vem daqui, e
+    // aparece dentro do próprio alerta porque o Gatus substitui o valor real
+    // na condição que falha. Conectada = 0 (literal: fora há zero horas), o
+    // que mantém a condição `== 0` verde no caso saudável. `null` só quando de
+    // fato não se sabe: fora, mas sem nenhum evento registrado.
+    hours_disconnected: connected
+      ? 0
+      : downSince
+        ? hoursBetween(downSince, deps.now())
+        : null,
     disconnected_since: downSince ? downSince.toISOString() : null,
     last_message_at: lastMessage ? lastMessage.toISOString() : null,
     last_state_change_at: lastChange ? lastChange.toISOString() : null,
