@@ -1,4 +1,8 @@
 node_modules/
+# Cache local do pnpm. O store normal e global (~/.local/share/pnpm/store), mas
+# `pnpm install` rodado dentro de container com HOME diferente cria o store aqui
+# — 130 MB de tarball na raiz do repo, esperando pra ser commitado por acidente.
+.pnpm-store/
 wa_credentials/
 .env
 media/*
