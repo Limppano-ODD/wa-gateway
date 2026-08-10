@@ -86,6 +86,116 @@ try {
 // Admin credentials are validated directly against environment variables (ADMIN_USER and ADMIN_PASSWORD)
 // and exist only as a virtual user for accessing the admin interface.
 
+// --- Observabilidade de sessão (Fase 0) ---
+//
+// `sessions` é a lista do que DEVERIA estar conectado. Sem ela não existe a
+// pergunta "quantas sessões faltam?": o processo só sabe o que está no ar, e
+// zero sessões no ar é indistinguível de zero sessões esperadas. Foi por isso
+// que 20 dias de queda passaram com /health devolvendo 200.
+//
+// `monitored` existe porque "esperada" é decisão de negócio, não de código: uma
+// sessão pode estar cadastrada e deliberadamente fora do alerta (dono mudou de
+// área, integração descontinuada). Sem esse flag a alternativa seria apagar a
+// linha — e aí se perde o histórico junto.
+db.exec(`
+  CREATE TABLE IF NOT EXISTS sessions (
+    name TEXT PRIMARY KEY,
+    monitored INTEGER NOT NULL DEFAULT 1,
+    last_message_at DATETIME,
+    last_state TEXT,
+    last_state_reason TEXT,
+    last_state_change_at DATETIME,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  );
+
+  CREATE TABLE IF NOT EXISTS session_events (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    session_name TEXT NOT NULL,
+    state TEXT NOT NULL,
+    reason TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_session_events_lookup
+    ON session_events (session_name, created_at DESC);
+`);
+
+// Popula a partir dos usuários existentes: hoje sessão e usuário são a mesma
+// coisa (sessionName = user.username em ~20 pontos do código). Quando a Fase 2
+// desacoplar os dois, esta tabela já é a fonte da verdade e o seed sai daqui.
+// INSERT OR IGNORE = idempotente, roda a cada boot sem duplicar nem sobrescrever.
+db.exec(`
+  INSERT OR IGNORE INTO sessions (name)
+  SELECT username FROM users WHERE is_admin = 0;
+`);
+
+export interface SessionRow {
+  name: string;
+  monitored: number;
+  last_message_at: string | null;
+  last_state: string | null;
+  last_state_reason: string | null;
+  last_state_change_at: string | null;
+  created_at: string;
+}
+
+export const sessionDb = {
+  getAll(): SessionRow[] {
+    return db
+      .prepare("SELECT * FROM sessions ORDER BY name")
+      .all() as SessionRow[];
+  },
+
+  getByName(name: string): SessionRow | undefined {
+    return db.prepare("SELECT * FROM sessions WHERE name = ?").get(name) as
+      | SessionRow
+      | undefined;
+  },
+
+  /**
+   * Grava a transição de estado E atualiza o retrato atual, numa transação só.
+   * O histórico responde "desde quando" — pergunta que hoje só o `docker logs`
+   * respondia, e que se perde quando o container é recriado.
+   *
+   * `reason` fica quase sempre null: a wa-multi-session não repassa o
+   * DisconnectReason nos callbacks. O sinal prático de logout é
+   * `credentials_present: false` no /status, não este campo.
+   */
+  recordEvent(name: string, state: string, reason: string | null = null): void {
+    const tx = db.transaction(() => {
+      db.prepare("INSERT OR IGNORE INTO sessions (name) VALUES (?)").run(name);
+      db.prepare(
+        "INSERT INTO session_events (session_name, state, reason) VALUES (?, ?, ?)"
+      ).run(name, state, reason);
+      db.prepare(
+        `UPDATE sessions
+            SET last_state = ?, last_state_reason = ?, last_state_change_at = CURRENT_TIMESTAMP
+          WHERE name = ?`
+      ).run(state, reason, name);
+    });
+    tx();
+  },
+
+  /**
+   * Marca que chegou tráfego. Conta QUALQUER mensagem recebida, inclusive
+   * `fromMe` e broadcast: a métrica mede o canal estar vivo, não atividade
+   * comercial. Sessão conectada que não recebe nada há muito tempo é o modo de
+   * falha que não gera evento de desconexão.
+   */
+  touchLastMessage(name: string): void {
+    db.prepare(
+      "UPDATE sessions SET last_message_at = CURRENT_TIMESTAMP WHERE name = ?"
+    ).run(name);
+  },
+
+  setMonitored(name: string, monitored: boolean): void {
+    db.prepare("UPDATE sessions SET monitored = ? WHERE name = ?").run(
+      monitored ? 1 : 0,
+      name
+    );
+  },
+};
+
 export interface User {
   id: number;
   username: string;

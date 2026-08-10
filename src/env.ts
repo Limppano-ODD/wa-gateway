@@ -34,5 +34,27 @@ export const env = z
       .refine((v) => v === "" || v.length >= 24, {
         message: "BRIDGE_ADMIN_TOKEN muito curto (mínimo 24 caracteres) — use algo como `openssl rand -hex 24`",
       }),
+    // --- Observabilidade (Fase 0) ---
+    // Token do Gatus para ler /status e /status/:session. O payload expõe nome
+    // de sessão, estado e telefone conectado — pouco, mas sem contrapartida em
+    // deixar aberto. VAZIO = rotas devolvem 503 (e o monitoramento alerta, que
+    // é o comportamento correto: melhor gritar do que ficar verde à toa).
+    STATUS_TOKEN: z
+      .string()
+      .default("")
+      .refine((v) => v === "" || v.length >= 24, {
+        message: "STATUS_TOKEN muito curto (mínimo 24 caracteres) — use algo como `openssl rand -hex 24`",
+      }),
+    // Backup do sqlite. O banco guarda usuários, callbacks e tokens de webhook
+    // num arquivo só, num volume só — perder custa re-parear tudo e
+    // reconfigurar os webhooks na mão. 0 desliga.
+    DB_BACKUP_INTERVAL_HOURS: z
+      .string()
+      .default("24")
+      .transform((e) => Number(e)),
+    DB_BACKUP_KEEP: z
+      .string()
+      .default("7")
+      .transform((e) => Number(e)),
   })
   .parse(process.env);
