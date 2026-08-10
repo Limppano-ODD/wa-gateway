@@ -35,7 +35,7 @@ Authorization: Bearer <STATUS_TOKEN>
       "connected": true,
       "credentials_present": true,
       "hours_without_message": 0.4,
-      "hours_disconnected": null,
+      "hours_disconnected": 0,
       "disconnected_since": null,
       "last_message_at": "2026-08-10T14:21:19.000Z",
       "last_state_change_at": "2026-08-10T14:21:04.000Z",
@@ -57,7 +57,7 @@ Existe porque o Gatus alerta **por endpoint**: com apenas o agregado, o alerta c
 |---|---|
 | `connected` | Verdade viva do socket: existe **e** está autenticado (`user` preenchido). Sessão em pareamento não conta como conectada |
 | `credentials_present` | **Decide se um restart resolve.** A biblioteca apaga o diretório de credenciais em `loggedOut`; sem credencial, só QR humano religa. Era a informação que só se obtinha com `ls` no volume |
-| `hours_disconnected` / `disconnected_since` | **Há quanto tempo está fora.** `null` quando conectada — o campo nunca precisa ser lido junto com `connected` para fazer sentido. Sai de `last_state_change_at`, que vive no sqlite: **reiniciar o container não zera o relógio da queda**. Também `null` quando a sessão nunca foi pareada, porque `0` significaria "acabou de cair" |
+| `hours_disconnected` / `disconnected_since` | **Há quanto tempo está fora.** `hours_disconnected` é **`0` quando conectada** — literal, está fora há zero horas. Ser sempre número no caso saudável é o que permite a condição `[BODY].hours_disconnected == 0`: quando ela falha, o Gatus substitui o valor real na mensagem (`[BODY].hours_disconnected (12.4) == 0`), então **o alerta já chega dizendo há quanto tempo caiu**. `null` fica reservado ao caso em que não se sabe: fora, sem nenhum evento registrado. Sai de `last_state_change_at`, que vive no sqlite — **reiniciar o container não zera o relógio da queda** |
 | `hours_without_message` | Número puro, sem juízo de valor — o limiar é decisão do monitoramento, não deste serviço. `null` = nunca recebeu nada. Conta qualquer mensagem recebida (inclusive `fromMe` e broadcast): mede o canal entregando, não atividade comercial. Pega o modo de falha que **não** gera evento de desconexão |
 | `monitored` | Sessão pode estar cadastrada e deliberadamente fora do alerta. Só as monitoradas entram em `sessions_expected` / `sessions_connected` / `sessions_down` — alerta que grita para sempre ensina todo mundo a ignorar o painel |
 | `last_state_reason` | Hoje quase sempre `null`: a `wa-multi-session` não repassa o `DisconnectReason` nos callbacks. O sinal prático de logout é `credentials_present: false` |
@@ -87,6 +87,12 @@ Por sessão:
     - "[STATUS] == 200"
     - "[BODY].connected == true"
     - "[BODY].credentials_present == true"
+    # Nao e redundante com `connected`: quando esta condicao falha, o Gatus
+    # substitui o valor real na mensagem do alerta --
+    #   [BODY].hours_disconnected (12.4) == 0
+    # -- entao o alerta ja chega dizendo QUAL sessao caiu (nome do monitor) e
+    # HA QUANTO TEMPO, sem ninguem precisar abrir o painel.
+    - "[BODY].hours_disconnected == 0"
 ```
 
 **Não monitorar com `[STATUS] == 200` apenas.** É o padrão dos outros endpoints do parque hoje, e é exatamente o que deixaria este serviço verde estando quebrado.

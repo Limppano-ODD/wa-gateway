@@ -86,17 +86,21 @@ test("sessão fora reporta há quantas horas está fora — 'qual caiu' vem do n
   assert.equal(r.sessions[0]?.disconnected_since, "2026-08-10T02:00:00.000Z");
 });
 
-test("sessão conectada tem hours_disconnected null — last_state_change_at ali é a hora em que ela SUBIU, reportar como queda seria o oposto da verdade", () => {
+test("sessão conectada tem hours_disconnected 0, não null — é o 0 que mantém a condição `== 0` do Gatus verde e faz o valor real aparecer no alerta quando cai", () => {
   const r = buildStatusReport(
     [row({ last_state: "connected", last_state_change_at: "2026-08-10 02:00:00" })],
     deps({ isConnected: () => true })
   );
 
-  assert.equal(r.sessions[0]?.hours_disconnected, null);
+  // Literal, não eufemismo: está fora há zero horas. Com null aqui, a condição
+  // ficaria permanentemente vermelha e o alerta perderia o tempo de queda.
+  assert.equal(r.sessions[0]?.hours_disconnected, 0);
+  // `disconnected_since` continua null: "desde quando" não tem sentido no ar,
+  // e ninguem checa timestamp com condicao numerica.
   assert.equal(r.sessions[0]?.disconnected_since, null);
 });
 
-test("sessão fora que nunca teve evento reporta null, não 0 — 0 significaria 'acabou de cair'", () => {
+test("null fica reservado ao caso em que nao se sabe: fora, sem nenhum evento registrado", () => {
   const r = buildStatusReport(
     [row({ last_state_change_at: null })],
     deps({ isConnected: () => false })
