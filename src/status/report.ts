@@ -15,6 +15,17 @@ export type SessionStatus = {
   connected: boolean;
   credentials_present: boolean;
   hours_without_message: number | null;
+  /**
+   * Há quantas horas a sessão está fora. `null` quando conectada — assim o
+   * campo nunca precisa ser lido junto com `connected` para fazer sentido.
+   *
+   * Sai de `last_state_change_at`, que vive no sqlite e portanto sobrevive a
+   * restart do container: reiniciar o processo não zera o relógio da queda.
+   * `null` também quando a sessão nunca teve evento registrado (cadastrada mas
+   * nunca pareada) — inventar "0 horas" ali seria mentir.
+   */
+  hours_disconnected: number | null;
+  disconnected_since: string | null;
   last_message_at: string | null;
   last_state_change_at: string | null;
   last_state_reason: string | null;
@@ -63,6 +74,11 @@ export function buildSessionStatus(
 ): SessionStatus {
   const connected = deps.isConnected(row.name);
   const lastMessage = parseSqliteUtc(row.last_message_at);
+  const lastChange = parseSqliteUtc(row.last_state_change_at);
+  // Só conta como "desde quando está fora" se ela está fora AGORA. Com a
+  // sessão no ar, `last_state_change_at` é o momento em que ela CONECTOU —
+  // reportar isso como tempo de queda seria o oposto da verdade.
+  const downSince = !connected && lastChange ? lastChange : null;
 
   return {
     name: row.name,
@@ -80,9 +96,14 @@ export function buildSessionStatus(
     hours_without_message: lastMessage
       ? hoursBetween(lastMessage, deps.now())
       : null,
+    // "Qual caiu" vem do nome; "há quanto tempo" vem daqui. Número puro, pelo
+    // mesmo motivo de hours_without_message: quem decide o que é grave é o
+    // monitoramento. `null` quando conectada, e também quando a sessão nunca
+    // teve evento — inventar 0 ali seria dizer "acabou de cair".
+    hours_disconnected: downSince ? hoursBetween(downSince, deps.now()) : null,
+    disconnected_since: downSince ? downSince.toISOString() : null,
     last_message_at: lastMessage ? lastMessage.toISOString() : null,
-    last_state_change_at:
-      parseSqliteUtc(row.last_state_change_at)?.toISOString() ?? null,
+    last_state_change_at: lastChange ? lastChange.toISOString() : null,
     last_state_reason: row.last_state_reason,
   };
 }
