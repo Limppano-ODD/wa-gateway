@@ -76,6 +76,15 @@ jobs:
       STATUS_TOKEN: ${{ secrets.STATUS_TOKEN }}
       DB_BACKUP_INTERVAL_HOURS: ${{ vars.DB_BACKUP_INTERVAL_HOURS }}
       DB_BACKUP_KEEP: ${{ vars.DB_BACKUP_KEEP }}
+      # Login Microsoft (Entra ID) — humano no browser.
+      PUBLIC_BASE_URL: ${{ vars.PUBLIC_BASE_URL }}
+      AZURE_AD_TENANT_ID: ${{ vars.AZURE_AD_TENANT_ID }}
+      AZURE_AD_CLIENT_ID: ${{ vars.AZURE_AD_CLIENT_ID }}
+      AZURE_AD_CLIENT_SECRET: ${{ secrets.AZURE_AD_CLIENT_SECRET }}
+      AZURE_AD_ADMIN_GROUP_ID: ${{ vars.AZURE_AD_ADMIN_GROUP_ID }}
+      ENTRA_BREAKGLASS_WIDS: ${{ vars.ENTRA_BREAKGLASS_WIDS }}
+      WEB_SESSION_HOURS: ${{ vars.WEB_SESSION_HOURS }}
+      AUTH_ALLOW_BASIC_FALLBACK: ${{ vars.AUTH_ALLOW_BASIC_FALLBACK }}
     steps:
       - name: Ensure project directory exists and clean
         run: |

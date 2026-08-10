@@ -1,5 +1,6 @@
 import { Hono } from "hono";
-import { basicAuthMiddleware, adminAuthMiddleware } from "../middlewares/auth.middleware";
+import { adminAuthMiddleware } from "../middlewares/auth.middleware";
+import { humanAuthMiddleware } from "../middlewares/human-auth.middleware";
 import { requestValidator } from "../middlewares/validation.middleware";
 import { z } from "zod";
 import { userDb, User } from "../database/db";
@@ -15,8 +16,9 @@ type Variables = {
 export const createAdminController = () => {
   const app = new Hono<{ Variables: Variables }>();
 
-  // Apply basic auth to all admin routes
-  app.use("*", basicAuthMiddleware());
+  // Humano: sessao do Entra primeiro, Basic como fallback da transicao.
+  // Ver src/middlewares/human-auth.middleware.ts.
+  app.use("*", humanAuthMiddleware());
   app.use("*", adminAuthMiddleware());
 
   // Get all users

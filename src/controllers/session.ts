@@ -62,8 +62,13 @@ export const createSessionController = () => {
         .filter((d) => d.length >= 10)
         .map((d) => `${d}@s.whatsapp.net`);
       const results = (await sock.onWhatsApp(...jids)) || [];
+      // `split` sempre devolve ao menos um elemento, mas com
+      // noUncheckedIndexedAccess o tipo de [0] e `string | undefined`. O `??`
+      // satisfaz o compilador sem mudar o comportamento.
       const onlyDigits = (s: any) =>
-        String(s ?? "").split("@")[0].split(":")[0].replace(/\D/g, "");
+        (String(s ?? "").split("@")[0] ?? "")
+          .split(":")[0]
+          ?.replace(/\D/g, "") ?? "";
       const data = results.map((r: any) => ({
         phone: onlyDigits(r.jid),
         lid: r.lid ? onlyDigits(r.lid) : null,

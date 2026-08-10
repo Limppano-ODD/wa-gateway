@@ -56,5 +56,55 @@ export const env = z
       .string()
       .default("7")
       .transform((e) => Number(e)),
+    // --- Login Microsoft / Entra ID (Fase 1) ---
+    // Vale SÓ para humano no browser. As rotas de máquina (/message, /profile,
+    // /session) continuam em Basic com credencial de serviço: trocá-las
+    // exigiria deploy coordenado de CRM, data-gateway e agent-platform ao
+    // mesmo tempo, e não é o que este passo resolve.
+    // URL pública, usada para montar a redirect_uri do Entra. Fixa por env e
+    // NÃO derivada do header Host: Host é controlado por quem chama, e uma
+    // redirect_uri forjada é o caminho clássico para roubar o code.
+    PUBLIC_BASE_URL: z.string().default("https://wa-gateway.odd.com.br"),
+    AZURE_AD_TENANT_ID: z.string().default(""),
+    AZURE_AD_CLIENT_ID: z.string().default(""),
+    AZURE_AD_CLIENT_SECRET: z.string().default(""),
+    // Grupo de segurança DEDICADO deste app. Grupo compartilhado entre apps
+    // vira permissão acidental — o app `user api` do parque já sofre disso.
+    AZURE_AD_ADMIN_GROUP_ID: z.string().default(""),
+    // Break-glass: papéis de diretório do Entra que entram como admin mesmo
+    // fora do grupo, lidos do claim `wids`. Default = Global Administrator e
+    // Privileged Role Administrator, que já podem se conceder qualquer coisa
+    // no tenant (barrá-los seria teatro). Ampliável sem deploy de código.
+    ENTRA_BREAKGLASS_WIDS: z
+      .string()
+      .default(
+        // Global Administrator, Privileged Role Administrator
+        "62e90394-69f5-4237-9190-012177145e10,e8611ab8-c189-46e8-94e1-60213ab1f814"
+      )
+      .transform((v) =>
+        v
+          .split(",")
+          .map((s) => s.trim().toLowerCase())
+          .filter(Boolean)
+      ),
+    // Vida da sessão do humano, em horas.
+    WEB_SESSION_HOURS: z
+      .string()
+      .default("12")
+      .transform((e) => Number(e)),
+    // Enquanto true, o Basic continua valendo nas rotas humanas. É a rede de
+    // segurança da transição: se o Entra falhar, o painel não fica inacessível.
+    // Vira false na Fase 4, quando o login Microsoft estiver provado.
+    AUTH_ALLOW_BASIC_FALLBACK: z
+      .string()
+      .default("true")
+      .transform((v) => v !== "false"),
   })
   .parse(process.env);
+
+/** Entra só entra em ação com as quatro configurações presentes. */
+export const entraConfigurado =
+  !!env.AZURE_AD_TENANT_ID &&
+  !!env.AZURE_AD_CLIENT_ID &&
+  !!env.AZURE_AD_CLIENT_SECRET &&
+  !!env.AZURE_AD_ADMIN_GROUP_ID;

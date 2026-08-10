@@ -33,6 +33,18 @@ services:
       # Backup do sqlite (usuários, callbacks e tokens de webhook). 0 desliga.
       - DB_BACKUP_INTERVAL_HOURS=${DB_BACKUP_INTERVAL_HOURS:-24}
       - DB_BACKUP_KEEP=${DB_BACKUP_KEEP:-7}
+      # Login Microsoft (Entra ID) — só para humano no browser. As rotas de
+      # máquina (/message, /profile, /session) seguem em Basic.
+      - PUBLIC_BASE_URL=${PUBLIC_BASE_URL:-https://wa-gateway.odd.com.br}
+      - AZURE_AD_TENANT_ID=${AZURE_AD_TENANT_ID:-}
+      - AZURE_AD_CLIENT_ID=${AZURE_AD_CLIENT_ID:-}
+      - AZURE_AD_CLIENT_SECRET=${AZURE_AD_CLIENT_SECRET:-}
+      - AZURE_AD_ADMIN_GROUP_ID=${AZURE_AD_ADMIN_GROUP_ID:-}
+      - ENTRA_BREAKGLASS_WIDS=${ENTRA_BREAKGLASS_WIDS:-62e90394-69f5-4237-9190-012177145e10,e8611ab8-c189-46e8-94e1-60213ab1f814}
+      - WEB_SESSION_HOURS=${WEB_SESSION_HOURS:-12}
+      # Rede de segurança da transição: com true, o Basic continua valendo nas
+      # rotas humanas. Vira false na Fase 4.
+      - AUTH_ALLOW_BASIC_FALLBACK=${AUTH_ALLOW_BASIC_FALLBACK:-true}
 
     volumes:
       # Mount WhatsApp credentials directory

@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sem acesso — WhatsApp Gateway</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+
+        .container {
+            background: white;
+            border-radius: 20px;
+            padding: 48px 40px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            text-align: center;
+            max-width: 520px;
+        }
+
+        .emoji { font-size: 56px; margin-bottom: 16px; }
+
+        h1 { color: #333; font-size: 26px; margin-bottom: 14px; }
+
+        p {
+            color: #666;
+            font-size: 16px;
+            line-height: 1.6;
+            margin-bottom: 16px;
+        }
+
+        .nota {
+            font-size: 14px;
+            color: #888;
+            background: #f7f7fb;
+            border-left: 3px solid #667eea;
+            border-radius: 6px;
+            padding: 14px 16px;
+            text-align: left;
+            margin: 22px 0 26px;
+        }
+
+        .button {
+            display: inline-block;
+            padding: 14px 28px;
+            border-radius: 10px;
+            text-decoration: none;
+            font-weight: 600;
+            font-size: 15px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        .button:hover { transform: translateY(-3px); box-shadow: 0 10px 20px rgba(0,0,0,0.2); }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="emoji">🔒</div>
+        <h1>Login feito, acesso não liberado</h1>
+        <p>
+            Sua conta Microsoft foi reconhecida, mas ela ainda não tem permissão
+            para gerenciar este serviço.
+        </p>
+        <div class="nota">
+            Isso é o comportamento esperado, não um erro: entrar com a conta da
+            empresa identifica você, mas não concede acesso sozinho. Um
+            administrador precisa liberar. Seu registro já foi criado, então
+            basta pedir a liberação — não é preciso entrar de novo antes disso.
+        </div>
+        <a href="/" class="button">Voltar ao início</a>
+    </div>
+</body>
+</html>

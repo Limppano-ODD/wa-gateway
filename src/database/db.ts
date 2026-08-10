@@ -129,6 +129,156 @@ db.exec(`
   SELECT username FROM users WHERE is_admin = 0;
 `);
 
+// --- Login Microsoft / Entra ID (Fase 1) ---
+//
+// `people` guarda QUEM ja entrou, e nada mais. Primeiro login NAO concede
+// acesso: cria a linha e para ai. Auto-provisionar acesso significaria que
+// qualquer pessoa do tenant entra e opera o WhatsApp corporativo.
+//
+// `web_sessions` guarda a sessao do browser no BANCO, e nao dentro de um JWT
+// no cookie. A diferenca aparece no dia em que alguem sai da empresa: derrubar
+// a sessao vira um DELETE, em vez de esperar o token expirar sozinho.
+//
+// `auth_events` e auditoria. Caminho privilegiado silencioso e backdoor: se o
+// break-glass existe, tem que ficar registrado quem entrou por ele e quando.
+db.exec(`
+  CREATE TABLE IF NOT EXISTS people (
+    oid TEXT PRIMARY KEY,
+    email TEXT,
+    name TEXT,
+    first_seen_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    last_login_at DATETIME
+  );
+
+  CREATE TABLE IF NOT EXISTS web_sessions (
+    id TEXT PRIMARY KEY,
+    person_oid TEXT NOT NULL,
+    is_admin INTEGER NOT NULL DEFAULT 0,
+    admin_via TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    expires_at DATETIME NOT NULL,
+    last_seen_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_web_sessions_person
+    ON web_sessions (person_oid);
+
+  CREATE TABLE IF NOT EXISTS auth_events (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    ts DATETIME DEFAULT CURRENT_TIMESTAMP,
+    email TEXT,
+    oid TEXT,
+    event TEXT NOT NULL,
+    method TEXT,
+    detail TEXT
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_auth_events_ts
+    ON auth_events (ts DESC);
+`);
+
+export interface Person {
+  oid: string;
+  email: string | null;
+  name: string | null;
+  first_seen_at: string;
+  last_login_at: string | null;
+}
+
+export interface WebSession {
+  id: string;
+  person_oid: string;
+  is_admin: number;
+  admin_via: string | null;
+  created_at: string;
+  expires_at: string;
+  last_seen_at: string;
+}
+
+export const authDb = {
+  upsertPerson(oid: string, email: string | null, name: string | null): void {
+    db.prepare(
+      `INSERT INTO people (oid, email, name, last_login_at)
+            VALUES (?, ?, ?, CURRENT_TIMESTAMP)
+       ON CONFLICT(oid) DO UPDATE
+              SET email = excluded.email,
+                  name = excluded.name,
+                  last_login_at = CURRENT_TIMESTAMP`
+    ).run(oid, email, name);
+  },
+
+  getPerson(oid: string): Person | undefined {
+    return db.prepare("SELECT * FROM people WHERE oid = ?").get(oid) as
+      | Person
+      | undefined;
+  },
+
+  createSession(
+    id: string,
+    personOid: string,
+    isAdmin: boolean,
+    adminVia: string | null,
+    expiresAt: Date
+  ): void {
+    db.prepare(
+      `INSERT INTO web_sessions (id, person_oid, is_admin, admin_via, expires_at)
+            VALUES (?, ?, ?, ?, ?)`
+    ).run(id, personOid, isAdmin ? 1 : 0, adminVia, expiresAt.toISOString());
+  },
+
+  /** Sessão viva = existe e ainda não expirou. Expirada é apagada na hora. */
+  getLiveSession(id: string, now: Date): WebSession | undefined {
+    const row = db.prepare("SELECT * FROM web_sessions WHERE id = ?").get(id) as
+      | WebSession
+      | undefined;
+    if (!row) return undefined;
+
+    if (new Date(row.expires_at).getTime() <= now.getTime()) {
+      this.deleteSession(id);
+      return undefined;
+    }
+
+    db.prepare(
+      "UPDATE web_sessions SET last_seen_at = CURRENT_TIMESTAMP WHERE id = ?"
+    ).run(id);
+    return row;
+  },
+
+  deleteSession(id: string): void {
+    db.prepare("DELETE FROM web_sessions WHERE id = ?").run(id);
+  },
+
+  /** Derruba TODAS as sessões de uma pessoa (saiu da empresa, perdeu acesso). */
+  deleteSessionsOfPerson(oid: string): number {
+    return db.prepare("DELETE FROM web_sessions WHERE person_oid = ?").run(oid)
+      .changes;
+  },
+
+  pruneExpiredSessions(now: Date): number {
+    return db
+      .prepare("DELETE FROM web_sessions WHERE expires_at <= ?")
+      .run(now.toISOString()).changes;
+  },
+
+  recordAuthEvent(e: {
+    email?: string | null;
+    oid?: string | null;
+    event: string;
+    method?: string | null;
+    detail?: string | null;
+  }): void {
+    db.prepare(
+      "INSERT INTO auth_events (email, oid, event, method, detail) VALUES (?, ?, ?, ?, ?)"
+    ).run(
+      e.email ?? null,
+      e.oid ?? null,
+      e.event,
+      e.method ?? null,
+      e.detail ?? null
+    );
+  },
+};
+
 export interface SessionRow {
   name: string;
   monitored: number;

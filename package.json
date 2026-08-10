@@ -28,13 +28,13 @@
     "express": "^4.18.2",
     "hono": "^4.6.13",
     "http-errors": "~1.6.3",
+    "jose": "^5.9.6",
     "moment": "^2.29.4",
     "morgan": "~1.9.1",
     "qrcode": "^1.5.1",
     "tsx": "^4.19.2",
     "wa-multi-session": "^3.8.3",
-    "zod": "^3.23.8",
-    "jose": "^5.9.6"
+    "zod": "^3.23.8"
   },
   "repository": {
     "type": "git",
@@ -43,6 +43,7 @@
   "devDependencies": {
     "@types/node": "^22.10.1",
     "@types/qrcode": "^1.5.5",
-    "@types/ws": "^8.5.12"
+    "@types/ws": "^8.5.12",
+    "typescript": "5.7.2"
   }
 }

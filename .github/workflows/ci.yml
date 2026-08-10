@@ -34,8 +34,18 @@ jobs:
       - name: Testes
         run: pnpm test
 
-      # Só os módulos da ponte: o resto do repo é código herdado do upstream
-      # (mimamch/wa-gateway) e tem erros de tipo pré-existentes que não são
-      # nossos pra corrigir agora. Travar o que é nosso já evita regressão.
-      - name: Typecheck dos módulos da ponte
-        run: pnpm exec tsc --noEmit -p . 2>&1 | (! grep -E "src/bridge/|src/env\.ts")
+      # Typecheck do repo INTEIRO, sem filtro.
+      #
+      # Antes este passo era `tsc ... | (! grep -E "src/bridge/|src/env.ts")`,
+      # e passava verde SEM NUNCA TER CHECADO NADA: `typescript` não estava
+      # instalado, `pnpm exec tsc` falhava com "Command not found", a mensagem
+      # de erro não casava com o grep, o `!` invertia e o passo ficava verde.
+      # Um gate que não gateia é pior que gate nenhum, porque cria confiança.
+      #
+      # Com o typescript agora fixado em devDependencies, sobravam 2 erros
+      # (ambos em session.ts, mesma linha), já corrigidos. Sem erro pendente,
+      # não há motivo para filtro: qualquer erro novo reprova, em qualquer
+      # arquivo. Se um dia precisar excluir algo, exclua por caminho no
+      # tsconfig, não por grep na saída.
+      - name: Typecheck
+        run: pnpm exec tsc --noEmit -p .

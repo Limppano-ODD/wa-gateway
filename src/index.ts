@@ -18,6 +18,7 @@ import { createAdminController } from "./controllers/admin";
 import { createDashboardController } from "./controllers/dashboard";
 import { createLogoutController } from "./controllers/logout";
 import { createStatusController } from "./controllers/status";
+import { createAuthController } from "./controllers/auth";
 import { scheduleBackups } from "./utils/db-backup";
 import { createBridgeController } from "./bridge/controller";
 import { attachBridgeWebSocket } from "./bridge/ws";
@@ -81,6 +82,12 @@ app.route("/logout", createLogoutController());
  * Separado do /health de propósito: ver src/controllers/status.ts.
  */
 app.route("/status", createStatusController());
+/**
+ * auth routes — login Microsoft (Entra ID) para humano no browser.
+ * PUBLICAS: sao elas que concedem a credencial, entao exigi-la aqui seria
+ * circular. Ver src/controllers/auth.ts.
+ */
+app.route("/auth", createAuthController());
 /**
  * dashboard routes
  */

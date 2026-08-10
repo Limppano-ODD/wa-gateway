@@ -84,6 +84,9 @@ importers:
       '@types/ws':
         specifier: ^8.5.12
         version: 8.18.1
+      typescript:
+        specifier: 5.7.2
+        version: 5.7.2
 
 packages:
 
@@ -456,7 +459,7 @@ packages:
         optional: true
 
   '@whiskeysockets/eslint-config@https://codeload.github.com/whiskeysockets/eslint-config/tar.gz/299e8389baf62f9aa3034de18ff0d62cc0a5e838':
-    resolution: {gitHosted: true, tarball: https://codeload.github.com/whiskeysockets/eslint-config/tar.gz/299e8389baf62f9aa3034de18ff0d62cc0a5e838}
+    resolution: {gitHosted: true, integrity: sha512-ei2RgAAN9EZHRHtbJHU6mbdPfpZDx5agWC70tCfDb4hth3Xle3DHhcxq/K5OSLmgFEAAPSmUuT/ax39ib/DguA==, tarball: https://codeload.github.com/whiskeysockets/eslint-config/tar.gz/299e8389baf62f9aa3034de18ff0d62cc0a5e838}
     version: 1.0.0
     peerDependencies:
       eslint: ^9.31.0
