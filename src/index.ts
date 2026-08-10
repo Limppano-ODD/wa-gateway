@@ -16,6 +16,7 @@ import { createProfileController } from "./controllers/profile";
 import { serveStatic } from "@hono/node-server/serve-static";
 import { createAdminController } from "./controllers/admin";
 import { createDashboardController } from "./controllers/dashboard";
+import { createLogoutController } from "./controllers/logout";
 import { createBridgeController } from "./bridge/controller";
 import { attachBridgeWebSocket } from "./bridge/ws";
 import fs from "fs";
@@ -69,6 +70,10 @@ app.get("/health", (c) => {
   return c.json({ status: "ok", timestamp: new Date().toISOString() });
 });
 
+/**
+ * logout route — PÚBLICA, sem basicAuthMiddleware. Ver src/controllers/logout.ts.
+ */
+app.route("/logout", createLogoutController());
 /**
  * dashboard routes
  */

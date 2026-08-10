@@ -29,8 +29,31 @@
             padding: 30px;
             margin-bottom: 30px;
             box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 20px;
         }
-        
+
+        .btn-logout {
+            display: inline-block;
+            flex-shrink: 0;
+            padding: 8px 18px;
+            border-radius: 5px;
+            background: white;
+            color: #667eea;
+            border: 2px solid #667eea;
+            text-decoration: none;
+            font-size: 13px;
+            font-weight: 600;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        .btn-logout:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(0,0,0,0.15);
+        }
+
         h1 {
             color: #333;
             margin-bottom: 10px;
@@ -164,8 +187,11 @@
 <body>
     <div class="container">
         <div class="header">
-            <h1>🔐 Admin Panel</h1>
-            <p class="subtitle">WhatsApp Gateway User Management</p>
+            <div class="header-left">
+                <h1>🔐 Admin Panel</h1>
+                <p class="subtitle">WhatsApp Gateway User Management</p>
+            </div>
+            <a href="/logout" class="btn-logout" title="Encerrar a sessão para entrar com outro usuário">🚪 Sair</a>
         </div>
         
         <div class="card">
