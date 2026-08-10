@@ -35,6 +35,8 @@ Authorization: Bearer <STATUS_TOKEN>
       "connected": true,
       "credentials_present": true,
       "hours_without_message": 0.4,
+      "hours_disconnected": null,
+      "disconnected_since": null,
       "last_message_at": "2026-08-10T14:21:19.000Z",
       "last_state_change_at": "2026-08-10T14:21:04.000Z",
       "last_state_reason": null
@@ -55,6 +57,7 @@ Existe porque o Gatus alerta **por endpoint**: com apenas o agregado, o alerta c
 |---|---|
 | `connected` | Verdade viva do socket: existe **e** está autenticado (`user` preenchido). Sessão em pareamento não conta como conectada |
 | `credentials_present` | **Decide se um restart resolve.** A biblioteca apaga o diretório de credenciais em `loggedOut`; sem credencial, só QR humano religa. Era a informação que só se obtinha com `ls` no volume |
+| `hours_disconnected` / `disconnected_since` | **Há quanto tempo está fora.** `null` quando conectada — o campo nunca precisa ser lido junto com `connected` para fazer sentido. Sai de `last_state_change_at`, que vive no sqlite: **reiniciar o container não zera o relógio da queda**. Também `null` quando a sessão nunca foi pareada, porque `0` significaria "acabou de cair" |
 | `hours_without_message` | Número puro, sem juízo de valor — o limiar é decisão do monitoramento, não deste serviço. `null` = nunca recebeu nada. Conta qualquer mensagem recebida (inclusive `fromMe` e broadcast): mede o canal entregando, não atividade comercial. Pega o modo de falha que **não** gera evento de desconexão |
 | `monitored` | Sessão pode estar cadastrada e deliberadamente fora do alerta. Só as monitoradas entram em `sessions_expected` / `sessions_connected` / `sessions_down` — alerta que grita para sempre ensina todo mundo a ignorar o painel |
 | `last_state_reason` | Hoje quase sempre `null`: a `wa-multi-session` não repassa o `DisconnectReason` nos callbacks. O sinal prático de logout é `credentials_present: false` |

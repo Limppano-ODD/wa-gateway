@@ -76,6 +76,46 @@ test("hours_without_message é null quando nunca chegou mensagem — quem decide
   assert.equal(r.sessions[0]?.last_message_at, null);
 });
 
+test("sessão fora reporta há quantas horas está fora — 'qual caiu' vem do nome, 'desde quando' vem daqui", () => {
+  const r = buildStatusReport(
+    [row({ last_state: "disconnected", last_state_change_at: "2026-08-10 02:00:00" })],
+    deps({ isConnected: () => false })
+  );
+
+  assert.equal(r.sessions[0]?.hours_disconnected, 12);
+  assert.equal(r.sessions[0]?.disconnected_since, "2026-08-10T02:00:00.000Z");
+});
+
+test("sessão conectada tem hours_disconnected null — last_state_change_at ali é a hora em que ela SUBIU, reportar como queda seria o oposto da verdade", () => {
+  const r = buildStatusReport(
+    [row({ last_state: "connected", last_state_change_at: "2026-08-10 02:00:00" })],
+    deps({ isConnected: () => true })
+  );
+
+  assert.equal(r.sessions[0]?.hours_disconnected, null);
+  assert.equal(r.sessions[0]?.disconnected_since, null);
+});
+
+test("sessão fora que nunca teve evento reporta null, não 0 — 0 significaria 'acabou de cair'", () => {
+  const r = buildStatusReport(
+    [row({ last_state_change_at: null })],
+    deps({ isConnected: () => false })
+  );
+
+  assert.equal(r.sessions[0]?.hours_disconnected, null);
+});
+
+test("o relógio da queda sobrevive a restart: sai do sqlite, não da memória do processo", () => {
+  // Simula processo recém-subido (nenhum evento nesta execução) com o banco
+  // guardando uma queda de ontem. Se o tempo viesse da memória, daria 0.
+  const r = buildStatusReport(
+    [row({ last_state: "disconnected", last_state_change_at: "2026-08-09 14:00:00" })],
+    deps({ isConnected: () => false })
+  );
+
+  assert.equal(r.sessions[0]?.hours_disconnected, 24);
+});
+
 test("credentials_present separa 'reconecta sozinho' de 'precisa de humano com o celular'", () => {
   const r = buildStatusReport(
     [row({ last_state: "disconnected" })],
