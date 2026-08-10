@@ -70,6 +70,12 @@ jobs:
       # "criar bot em prd" impossível de fazer sem incomodar quem já usa.
       # Precisa ser o MESMO valor do BRIDGE_ADMIN_TOKEN do agent-platform.
       BRIDGE_ADMIN_TOKEN: ${{ secrets.BRIDGE_ADMIN_TOKEN }}
+      # Token do Gatus para ler /status e /status/:session. Sem ele os endpoints
+      # devolvem 503 e o monitoramento alerta — fail-closed e barulhento, que é
+      # o oposto do /health devolvendo 200 sem sessão nenhuma conectada.
+      STATUS_TOKEN: ${{ secrets.STATUS_TOKEN }}
+      DB_BACKUP_INTERVAL_HOURS: ${{ vars.DB_BACKUP_INTERVAL_HOURS }}
+      DB_BACKUP_KEEP: ${{ vars.DB_BACKUP_KEEP }}
     steps:
       - name: Ensure project directory exists and clean
         run: |

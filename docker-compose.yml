@@ -26,7 +26,14 @@ services:
       # Vazio = rotas de registro desligadas (fail-closed); só vale o
       # BRIDGE_TENANTS do env, como era antes.
       - BRIDGE_ADMIN_TOKEN=${BRIDGE_ADMIN_TOKEN:-}
-    
+      # Observabilidade: token que o Gatus usa em /status e /status/:session.
+      # Vazio = endpoints devolvem 503 (e o monitoramento alerta — de propósito,
+      # é melhor gritar do que ficar verde sem estar medindo nada).
+      - STATUS_TOKEN=${STATUS_TOKEN:-}
+      # Backup do sqlite (usuários, callbacks e tokens de webhook). 0 desliga.
+      - DB_BACKUP_INTERVAL_HOURS=${DB_BACKUP_INTERVAL_HOURS:-24}
+      - DB_BACKUP_KEEP=${DB_BACKUP_KEEP:-7}
+
     volumes:
       # Mount WhatsApp credentials directory
       - ./wa_credentials:/app/wa_credentials

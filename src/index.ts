@@ -17,6 +17,8 @@ import { serveStatic } from "@hono/node-server/serve-static";
 import { createAdminController } from "./controllers/admin";
 import { createDashboardController } from "./controllers/dashboard";
 import { createLogoutController } from "./controllers/logout";
+import { createStatusController } from "./controllers/status";
+import { scheduleBackups } from "./utils/db-backup";
 import { createBridgeController } from "./bridge/controller";
 import { attachBridgeWebSocket } from "./bridge/ws";
 import fs from "fs";
@@ -75,6 +77,11 @@ app.get("/health", (c) => {
  */
 app.route("/logout", createLogoutController());
 /**
+ * status routes — verdade sobre as sessões, para o monitoramento.
+ * Separado do /health de propósito: ver src/controllers/status.ts.
+ */
+app.route("/status", createStatusController());
+/**
  * dashboard routes
  */
 app.route("/dashboard", createDashboardController());
@@ -120,7 +127,7 @@ whastapp.onConnected((session) => {
 });
 
 // Implement Per-User Webhook
-import { User, userDb } from "./database/db";
+import { User, userDb, sessionDb } from "./database/db";
 import axios from "axios";
 import { MessageReceived } from "wa-multi-session";
 import { messageStore } from "./utils/message-store";
@@ -163,6 +170,16 @@ async function sendWebhookWithAuth(
 whastapp.onMessageReceived(async (message: MessageReceived) => {
   // Store message for later retrieval (for quoting/replying)
   messageStore.storeMessage(message);
+
+  // Marca tráfego ANTES de qualquer filtro (fromMe, broadcast, grupo): o que
+  // se mede aqui é o canal estar entregando, não atividade comercial. Sessão
+  // conectada que não recebe NADA há muito tempo é o modo de falha que não
+  // gera evento de desconexão nenhum — e é o único jeito de enxergá-lo.
+  try {
+    sessionDb.touchLastMessage(message.sessionId);
+  } catch {
+    // Nunca deixar contabilidade derrubar a entrega da mensagem.
+  }
 
   if (message.key.fromMe || message.key.remoteJid?.includes("broadcast"))
     return;
@@ -282,18 +299,45 @@ const sendSessionWebhook = async (sessionName: string, status: "connected" | "co
   }
 };
 
+/**
+ * Persiste a transição ANTES de tentar o webhook. O webhook depende de rede e
+ * de o destino existir — e não existia: o CRM nunca implementou a rota
+ * `${callback_url}/session`, então todo evento de desconexão caía num 404 e
+ * sumia. Gravar primeiro garante que o histórico sobreviva mesmo quando o
+ * avisado não escuta.
+ *
+ * Também loga em JSON de uma linha, com o mesmo `tag` do /status, para o log do
+ * container ser rastreável junto com o endpoint.
+ */
+const registrarEstado = (session: string, state: string) => {
+  try {
+    sessionDb.recordEvent(session, state);
+  } catch (err) {
+    console.error(
+      JSON.stringify({
+        tag: "wa_session_event",
+        event: "persist_failed",
+        session,
+        state,
+        error: err instanceof Error ? err.message : String(err),
+      })
+    );
+  }
+  console.log(JSON.stringify({ tag: "wa_session_event", session, state }));
+};
+
 whastapp.onConnected((session) => {
-  console.log(`session: '${session}' connected`);
+  registrarEstado(session, "connected");
   sendSessionWebhook(session, "connected");
 });
 
 whastapp.onConnecting((session) => {
-  console.log(`session: '${session}' connecting`);
+  registrarEstado(session, "connecting");
   sendSessionWebhook(session, "connecting");
 });
 
 whastapp.onDisconnected((session) => {
-  console.log(`session: '${session}' disconnected`);
+  registrarEstado(session, "disconnected");
   sendSessionWebhook(session, "disconnected");
 });
 
@@ -304,3 +348,7 @@ if (env.WEBHOOK_BASE_URL) {
 // End Implement Per-User Webhook
 
 whastapp.loadSessionsFromStorage();
+
+// Backup do sqlite (usuários, callbacks e tokens de webhook num arquivo só).
+// Depois do loadSessions para não competir com o boot das sessões.
+scheduleBackups();
