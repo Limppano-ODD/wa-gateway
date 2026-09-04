@@ -7,6 +7,7 @@ import { HTTPException } from "hono/http-exception";
 import { basicAuthMiddleware } from "../middlewares/auth.middleware";
 import type { User } from "../database/db";
 import { messageStore } from "../utils/message-store";
+import { sessionDb } from "../database/db";
 
 type Variables = {
   user: User;
@@ -46,6 +47,22 @@ export const createMessageController = () => {
       if (!isExist) {
         throw new HTTPException(400, {
           message: "Session does not exist",
+        });
+      }
+
+      // A sessão EXISTIR não quer dizer que ela esteja no ar. Enquanto ela
+      // estiver reconectando, o envio era aceito e respondido 200 — e a
+      // mensagem chegava ilegível no aparelho do destinatário, porque saía
+      // cifrada com uma chave que a reconexão descarta ("Aguardando
+      // mensagem"). Quem chamou nunca ficava sabendo.
+      //
+      // `last_state` null = sessão que ainda não registrou transição nenhuma;
+      // aí não bloqueia, para não recusar envio de sessão antiga só por falta
+      // de histórico.
+      const estado = sessionDb.getByName(payload.session)?.last_state;
+      if (estado && estado !== "connected") {
+        throw new HTTPException(503, {
+          message: `Session "${payload.session}" is ${estado} — message not sent`,
         });
       }
 
