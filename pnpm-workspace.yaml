@@ -19,3 +19,22 @@ onlyBuiltDependencies:
   - better-sqlite3
   - esbuild
   - protobufjs
+
+# wa-multi-session 3.8.3 fixa baileys 6.7.18 (mai/2025). As 6.7.19..24 sao da
+# mesma linha major: a API que o wa-multi-session usa nao muda, o que entra sao
+# as correcoes de protocolo que o WhatsApp exigiu de la pra ca.
+# Subir o wa-multi-session pra 4.x traria baileys 7.0.0-rc (release candidate)
+# alem de major bump da lib — fica pra depois, se este passo nao resolver.
+overrides:
+  '@whiskeysockets/baileys': 6.7.24
+
+# O baileys depende de `libsignal` direto do GitHub — e SEMPRE dependeu: a
+# 6.7.18 que roda hoje usa `github:WhiskeySockets/libsignal-node`. Da 6.7.19 em
+# diante a mesma dependencia passou a ser declarada como
+# `git+https://github.com/...`, e o pnpm 11 classifica essa forma como "exotica"
+# e aborta o install (ERR_PNPM_EXOTIC_SUBDEP).
+#
+# Ou seja: isto NAO introduz dependencia de git nova, so aceita a notacao nova
+# da mesma dependencia que ja esta instalada. Sem isto, nenhuma atualizacao do
+# baileys e possivel.
+blockExoticSubdeps: false
