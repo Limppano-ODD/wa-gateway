@@ -74,6 +74,9 @@ jobs:
       # devolvem 503 e o monitoramento alerta — fail-closed e barulhento, que é
       # o oposto do /health devolvendo 200 sem sessão nenhuma conectada.
       STATUS_TOKEN: ${{ secrets.STATUS_TOKEN }}
+      # Liga o log interno do Baileys sob demanda — ver comentário no
+      # docker-compose.yml. Var, não secret (não é sensível).
+      WA_DEBUG_SIGNAL: ${{ vars.WA_DEBUG_SIGNAL }}
       DB_BACKUP_INTERVAL_HOURS: ${{ vars.DB_BACKUP_INTERVAL_HOURS }}
       DB_BACKUP_KEEP: ${{ vars.DB_BACKUP_KEEP }}
       # Login Microsoft (Entra ID) — humano no browser.
