@@ -1,9 +1,25 @@
 diff --git a/dist/Socket/index.js b/dist/Socket/index.js
-index eb1aa4dd806c29f86c309d00422b32fb526e2d95..4dbb01e7d3ffb7968df965f325ea53ee4ec5363b 100644
+index eb1aa4dd806c29f86c309d00422b32fb526e2d95..0607fab8e876cb37d10656e390c10f4f67cee7c4 100644
 --- a/dist/Socket/index.js
 +++ b/dist/Socket/index.js
-@@ -57,8 +57,32 @@ const message_status_1 = require("../Utils/message-status");
+@@ -55,10 +55,48 @@ const save_media_1 = require("../Utils/save-media");
+ const Error_1 = require("../Error");
+ const message_status_1 = require("../Utils/message-status");
  const sessions = new Map();
++// Envolve sendMessage do socket pra cachear a mensagem enviada NA HORA que o
++// envio resolve — não no evento messages.upsert (assíncrono, dispara por
++// último). Um segundo aparelho pode pedir "retry" em <1s, mais rápido que o
++// upsert processar; sem isso o cache às vezes ainda estava vazio quando o
++// retry chegava (intermitente — só falhava na corrida).
++function wrapSendMessageForRetryCache(sock) {
++    const original = sock.sendMessage.bind(sock);
++    sock.sendMessage = (...args) => __awaiter(this, void 0, void 0, function* () {
++        const result = yield original(...args);
++        cacheSentMessages([result]);
++        return result;
++    });
++    return sock;
++}
  const callback = new Map();
  const retryCount = new Map();
 +// Cache de mensagens ENVIADAS por esta sessão, por messageId. Necessário pra
@@ -36,7 +52,7 @@ index eb1aa4dd806c29f86c309d00422b32fb526e2d95..4dbb01e7d3ffb7968df965f325ea53ee
  });
  const startSession = (...args_1) => __awaiter(void 0, [...args_1], void 0, function* (sessionId = "mysession", options = { printQR: true }) {
      if (isSessionExistAndRunning(sessionId))
-@@ -68,8 +92,9 @@ const startSession = (...args_1) => __awaiter(void 0, [...args_1], void 0, funct
+@@ -68,11 +106,13 @@ const startSession = (...args_1) => __awaiter(void 0, [...args_1], void 0, funct
          const { state, saveCreds } = yield (0, baileys_1.useMultiFileAuthState)(path_1.default.resolve(Defaults_1.CREDENTIALS.DIR_NAME, sessionId + Defaults_1.CREDENTIALS.PREFIX));
          const sock = (0, baileys_1.default)({
              version,
@@ -47,7 +63,11 @@ index eb1aa4dd806c29f86c309d00422b32fb526e2d95..4dbb01e7d3ffb7968df965f325ea53ee
              markOnlineOnConnect: false,
              browser: baileys_1.Browsers.ubuntu("Chrome"),
          });
-@@ -132,6 +157,7 @@ const startSession = (...args_1) => __awaiter(void 0, [...args_1], void 0, funct
++        wrapSendMessageForRetryCache(sock);
+         sessions.set(sessionId, Object.assign({}, sock));
+         try {
+             sock.ev.process((events) => __awaiter(void 0, void 0, void 0, function* () {
+@@ -132,6 +172,7 @@ const startSession = (...args_1) => __awaiter(void 0, [...args_1], void 0, funct
                      (_o = options.onMessageUpdated) === null || _o === void 0 ? void 0 : _o.call(options, data);
                  }
                  if (events["messages.upsert"]) {
@@ -55,7 +75,7 @@ index eb1aa4dd806c29f86c309d00422b32fb526e2d95..4dbb01e7d3ffb7968df965f325ea53ee
                      const msg = (_p = events["messages.upsert"]
                          .messages) === null || _p === void 0 ? void 0 : _p[0];
                      msg.sessionId = sessionId;
-@@ -167,8 +193,9 @@ const startSessionWithPairingCode = (sessionId, options) => __awaiter(void 0, vo
+@@ -167,11 +208,13 @@ const startSessionWithPairingCode = (sessionId, options) => __awaiter(void 0, vo
          const sock = (0, baileys_1.default)({
              version,
              printQRInTerminal: false,
@@ -66,7 +86,11 @@ index eb1aa4dd806c29f86c309d00422b32fb526e2d95..4dbb01e7d3ffb7968df965f325ea53ee
              markOnlineOnConnect: false,
              browser: baileys_1.Browsers.ubuntu("Chrome"),
          });
-@@ -228,6 +255,7 @@ const startSessionWithPairingCode = (sessionId, options) => __awaiter(void 0, vo
++        wrapSendMessageForRetryCache(sock);
+         sessions.set(sessionId, Object.assign({}, sock));
+         try {
+             if (!sock.authState.creds.registered) {
+@@ -228,6 +271,7 @@ const startSessionWithPairingCode = (sessionId, options) => __awaiter(void 0, vo
                      (_h = callback.get(Defaults_1.CALLBACK_KEY.ON_MESSAGE_UPDATED)) === null || _h === void 0 ? void 0 : _h(sessionId, data);
                  }
                  if (events["messages.upsert"]) {
