@@ -38,3 +38,6 @@ overrides:
 # da mesma dependencia que ja esta instalada. Sem isto, nenhuma atualizacao do
 # baileys e possivel.
 blockExoticSubdeps: false
+
+patchedDependencies:
+  wa-multi-session@3.8.3: patches/wa-multi-session@3.8.3.patch

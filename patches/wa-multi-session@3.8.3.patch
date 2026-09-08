@@ -1,0 +1,22 @@
+diff --git a/dist/Socket/index.js b/dist/Socket/index.js
+index eb1aa4dd806c29f86c309d00422b32fb526e2d95..dd8f936ffaab538e79ad6d74a639274adfacf8f6 100644
+--- a/dist/Socket/index.js
++++ b/dist/Socket/index.js
+@@ -68,7 +68,7 @@ const startSession = (...args_1) => __awaiter(void 0, [...args_1], void 0, funct
+         const { state, saveCreds } = yield (0, baileys_1.useMultiFileAuthState)(path_1.default.resolve(Defaults_1.CREDENTIALS.DIR_NAME, sessionId + Defaults_1.CREDENTIALS.PREFIX));
+         const sock = (0, baileys_1.default)({
+             version,
+-            auth: state,
++            auth: { creds: state.creds, keys: (0, baileys_1.makeCacheableSignalKeyStore)(state.keys, P) },
+             logger: P,
+             markOnlineOnConnect: false,
+             browser: baileys_1.Browsers.ubuntu("Chrome"),
+@@ -167,7 +167,7 @@ const startSessionWithPairingCode = (sessionId, options) => __awaiter(void 0, vo
+         const sock = (0, baileys_1.default)({
+             version,
+             printQRInTerminal: false,
+-            auth: state,
++            auth: { creds: state.creds, keys: (0, baileys_1.makeCacheableSignalKeyStore)(state.keys, P) },
+             logger: P,
+             markOnlineOnConnect: false,
+             browser: baileys_1.Browsers.ubuntu("Chrome"),
