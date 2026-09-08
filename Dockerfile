@@ -18,6 +18,9 @@ WORKDIR /app
 
 # Copy package files
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+# patches/: pnpm precisa do .patch referenciado em patchedDependencies
+# (pnpm-workspace.yaml) pra resolver o install — sem isso quebra com ENOENT.
+COPY patches ./patches
 
 # Install dependencies
 RUN pnpm install --frozen-lockfile
@@ -35,6 +38,9 @@ RUN apk add --no-cache python3 make g++
 
 # Copy package files
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+# patches/: pnpm precisa do .patch referenciado em patchedDependencies
+# (pnpm-workspace.yaml) pra resolver o install — sem isso quebra com ENOENT.
+COPY patches ./patches
 
 # Install production dependencies only
 RUN pnpm install --frozen-lockfile --prod
