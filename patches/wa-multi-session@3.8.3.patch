@@ -1,31 +1,76 @@
 diff --git a/dist/Socket/index.js b/dist/Socket/index.js
-index eb1aa4dd806c29f86c309d00422b32fb526e2d95..6884a6f2024835f344b3878d08df60a5f1d29328 100644
+index eb1aa4dd806c29f86c309d00422b32fb526e2d95..4dbb01e7d3ffb7968df965f325ea53ee4ec5363b 100644
 --- a/dist/Socket/index.js
 +++ b/dist/Socket/index.js
-@@ -58,7 +58,7 @@ const sessions = new Map();
+@@ -57,8 +57,32 @@ const message_status_1 = require("../Utils/message-status");
+ const sessions = new Map();
  const callback = new Map();
  const retryCount = new Map();
++// Cache de mensagens ENVIADAS por esta sessão, por messageId. Necessário pra
++// responder "retry" de aparelho vinculado (multi-device) — sem isso o Baileys
++// não tem o que reenviar quando um segundo aparelho pede a mensagem de novo,
++// e esse aparelho fica preso em "Aguardando mensagem" pra sempre (log mostra
++// "recv retry request, but message not available"). Cap simples evita
++// crescimento sem limite; TTL não é necessário — retry acontece em segundos,
++// não em horas.
++const sentMessageCache = new Map();
++const SENT_MESSAGE_CACHE_MAX = 500;
++function cacheSentMessages(msgs) {
++    for (const m of msgs || []) {
++        if (!(m === null || m === void 0 ? void 0 : m.key) || !m.key.fromMe || !m.key.id || !m.message)
++            continue;
++        sentMessageCache.set(m.key.id, m.message);
++        if (sentMessageCache.size > SENT_MESSAGE_CACHE_MAX) {
++            sentMessageCache.delete(sentMessageCache.keys().next().value);
++        }
++    }
++}
++function getCachedMessage(key) {
++    return __awaiter(this, void 0, void 0, function* () {
++        return sentMessageCache.get(key.id);
++    });
++}
  const P = require("pino")({
 -    level: "silent",
 +    level: process.env.WA_DEBUG_SIGNAL === "1" ? "debug" : "silent",
  });
  const startSession = (...args_1) => __awaiter(void 0, [...args_1], void 0, function* (sessionId = "mysession", options = { printQR: true }) {
      if (isSessionExistAndRunning(sessionId))
-@@ -68,7 +68,7 @@ const startSession = (...args_1) => __awaiter(void 0, [...args_1], void 0, funct
+@@ -68,8 +92,9 @@ const startSession = (...args_1) => __awaiter(void 0, [...args_1], void 0, funct
          const { state, saveCreds } = yield (0, baileys_1.useMultiFileAuthState)(path_1.default.resolve(Defaults_1.CREDENTIALS.DIR_NAME, sessionId + Defaults_1.CREDENTIALS.PREFIX));
          const sock = (0, baileys_1.default)({
              version,
 -            auth: state,
 +            auth: { creds: state.creds, keys: (0, baileys_1.makeCacheableSignalKeyStore)(state.keys, P) },
              logger: P,
++            getMessage: getCachedMessage,
              markOnlineOnConnect: false,
              browser: baileys_1.Browsers.ubuntu("Chrome"),
-@@ -167,7 +167,7 @@ const startSessionWithPairingCode = (sessionId, options) => __awaiter(void 0, vo
+         });
+@@ -132,6 +157,7 @@ const startSession = (...args_1) => __awaiter(void 0, [...args_1], void 0, funct
+                     (_o = options.onMessageUpdated) === null || _o === void 0 ? void 0 : _o.call(options, data);
+                 }
+                 if (events["messages.upsert"]) {
++                    cacheSentMessages(events["messages.upsert"].messages);
+                     const msg = (_p = events["messages.upsert"]
+                         .messages) === null || _p === void 0 ? void 0 : _p[0];
+                     msg.sessionId = sessionId;
+@@ -167,8 +193,9 @@ const startSessionWithPairingCode = (sessionId, options) => __awaiter(void 0, vo
          const sock = (0, baileys_1.default)({
              version,
              printQRInTerminal: false,
 -            auth: state,
 +            auth: { creds: state.creds, keys: (0, baileys_1.makeCacheableSignalKeyStore)(state.keys, P) },
              logger: P,
++            getMessage: getCachedMessage,
              markOnlineOnConnect: false,
              browser: baileys_1.Browsers.ubuntu("Chrome"),
+         });
+@@ -228,6 +255,7 @@ const startSessionWithPairingCode = (sessionId, options) => __awaiter(void 0, vo
+                     (_h = callback.get(Defaults_1.CALLBACK_KEY.ON_MESSAGE_UPDATED)) === null || _h === void 0 ? void 0 : _h(sessionId, data);
+                 }
+                 if (events["messages.upsert"]) {
++                    cacheSentMessages(events["messages.upsert"].messages);
+                     const msg = (_j = events["messages.upsert"]
+                         .messages) === null || _j === void 0 ? void 0 : _j[0];
+                     msg.sessionId = sessionId;
