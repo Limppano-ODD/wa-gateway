@@ -1,7 +1,16 @@
 diff --git a/dist/Socket/index.js b/dist/Socket/index.js
-index eb1aa4dd806c29f86c309d00422b32fb526e2d95..dd8f936ffaab538e79ad6d74a639274adfacf8f6 100644
+index eb1aa4dd806c29f86c309d00422b32fb526e2d95..6884a6f2024835f344b3878d08df60a5f1d29328 100644
 --- a/dist/Socket/index.js
 +++ b/dist/Socket/index.js
+@@ -58,7 +58,7 @@ const sessions = new Map();
+ const callback = new Map();
+ const retryCount = new Map();
+ const P = require("pino")({
+-    level: "silent",
++    level: process.env.WA_DEBUG_SIGNAL === "1" ? "debug" : "silent",
+ });
+ const startSession = (...args_1) => __awaiter(void 0, [...args_1], void 0, function* (sessionId = "mysession", options = { printQR: true }) {
+     if (isSessionExistAndRunning(sessionId))
 @@ -68,7 +68,7 @@ const startSession = (...args_1) => __awaiter(void 0, [...args_1], void 0, funct
          const { state, saveCreds } = yield (0, baileys_1.useMultiFileAuthState)(path_1.default.resolve(Defaults_1.CREDENTIALS.DIR_NAME, sessionId + Defaults_1.CREDENTIALS.PREFIX));
          const sock = (0, baileys_1.default)({
