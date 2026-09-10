@@ -1,6 +1,5 @@
 import axios from "axios";
-import { userDb } from "../database/db.ts";
-import type { User } from "../database/db.ts";
+import { User, userDb } from "../database/db";
 
 export interface OAuthTokenResponse {
   access_token: string;

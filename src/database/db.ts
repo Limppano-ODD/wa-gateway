@@ -1,7 +1,7 @@
 import Database from "better-sqlite3";
 import path from "path";
 import bcrypt from "bcrypt";
-import { env } from "../env.ts";
+import { env } from "../env";
 
 const db: Database.Database = new Database(env.DB_PATH);
 

@@ -1,4 +1,4 @@
-import type { SessionRow } from "../database/db.ts";
+import type { SessionRow } from "../database/db";
 
 /**
  * Monta o retrato de saúde das sessões.

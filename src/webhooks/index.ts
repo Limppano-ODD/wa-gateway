@@ -1,5 +1,5 @@
 import axios from "axios";
-import { env } from "../env.ts";
+import { env } from "../env";
 
 export type CreateWebhookProps = {
   baseUrl: string;

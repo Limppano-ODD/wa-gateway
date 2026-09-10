@@ -1,5 +1,4 @@
-import { webhookClient } from "./index.ts";
-import type { CreateWebhookProps } from "./index.ts";
+import { CreateWebhookProps, webhookClient } from ".";
 
 type SessionStatus = "connected" | "disconnected" | "connecting";
 

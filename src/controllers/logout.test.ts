@@ -12,7 +12,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { Hono } from "hono";
-import { BASIC_REALM, createLogoutController } from "./logout.ts";
+import { BASIC_REALM, createLogoutController } from "./logout";
 
 const REALM = 'Basic realm="WA Gateway"';
 
@@ -38,7 +38,7 @@ test("realm do logout é o MESMO usado pelo basicAuthMiddleware", async () => {
   // banco (better-sqlite3) e env só para ler uma string. O que precisa ficar
   // travado é a igualdade — realm diferente = logoff que não limpa nada.
   const middleware = readFileSync(
-    join(import.meta.dirname, "../middlewares/auth.middleware.ts"),
+    join(__dirname, "../middlewares/auth.middleware.ts"),
     "utf-8"
   );
 

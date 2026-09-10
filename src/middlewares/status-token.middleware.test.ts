@@ -7,7 +7,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { Hono } from "hono";
-import { statusTokenMiddleware, tokenMatches } from "./status-token.middleware.ts";
+import { statusTokenMiddleware, tokenMatches } from "./status-token.middleware";
 
 const TOKEN = "a".repeat(32);
 

@@ -1,6 +1,6 @@
 import { createHash, randomBytes } from "crypto";
 import { createRemoteJWKSet, jwtVerify } from "jose";
-import { env } from "../env.ts";
+import { env } from "../env";
 
 /**
  * Cliente OpenID Connect do Entra ID — Authorization Code + PKCE.

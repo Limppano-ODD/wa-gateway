@@ -32,9 +32,9 @@
 //   }
 
 import { timingSafeEqual } from "node:crypto";
-import { env } from "../env.ts";
-import { storeDisponivel, tenantStore } from "./store.ts";
-import { bridgeHub } from "./hub.ts";
+import { env } from "../env";
+import { storeDisponivel, tenantStore } from "./store";
+import { bridgeHub } from "./hub";
 
 export interface TenantDef {
   wsToken: string;

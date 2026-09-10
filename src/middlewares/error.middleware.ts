@@ -1,8 +1,8 @@
-import type { ErrorHandler } from "hono";
+import { ErrorHandler } from "hono";
 import { HTTPException } from "hono/http-exception";
-import type { StatusCode } from "hono/utils/http-status";
-import { ApplicationError } from "../errors/index.ts";
-import { env } from "../env.ts";
+import { StatusCode } from "hono/utils/http-status";
+import { ApplicationError } from "../errors";
+import { env } from "../env";
 
 export const globalErrorMiddleware: ErrorHandler = (err, c) => {
   if (err instanceof HTTPException && err.message) {
