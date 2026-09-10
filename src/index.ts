@@ -20,13 +20,11 @@ import { createLogoutController } from "./controllers/logout";
 import { createStatusController } from "./controllers/status";
 import { createAuthController } from "./controllers/auth";
 import { scheduleBackups } from "./utils/db-backup";
-import { iniciarLimpezaPeriodica } from "./utils/limpeza-sessao-lid";
 import { createBridgeController } from "./bridge/controller";
 import { attachBridgeWebSocket } from "./bridge/ws";
 import fs from "fs";
 import path from "path";
 import { registrarReconexao, zerarReconexao, registrarStatus } from "./utils/mensagem-diagnostico";
-import { iniciarAutoCuraMensagemPresa } from "./utils/auto-cura-mensagem-presa";
 // Initialize database
 import "./database/db";
 
@@ -387,14 +385,3 @@ whastapp.loadSessionsFromStorage();
 // Backup do sqlite (usuários, callbacks e tokens de webhook num arquivo só).
 // Depois do loadSessions para não competir com o boot das sessões.
 scheduleBackups();
-
-// Limpeza automática da sessão de criptografia duplicada/travada que causa
-// "Aguardando mensagem" pra sempre (ver limpeza-sessao-lid.ts). Varredura
-// periódica, pega o que sobrar.
-iniciarLimpezaPeriodica();
-
-// Auto-cura: detecta a MENSAGEM presa na hora (60s sem confirmar entrega) e
-// já limpa + reenvia essa mensagem específica, sem esperar a varredura
-// periódica e sem ninguém precisar mandar de novo na mão (ver
-// auto-cura-mensagem-presa.ts).
-iniciarAutoCuraMensagemPresa();
