@@ -8,7 +8,7 @@ overrides:
   '@whiskeysockets/baileys': 6.7.24
 
 patchedDependencies:
-  wa-multi-session@3.8.3: 5cf242bb68011ec08c19575c324c00b5a163dff11532e9506f7b8bf8bf321488
+  wa-multi-session@3.8.3: a403e372b782d64b714c1b7bdc4093e1a82a02109335bd6e0fcd96c1a95b7bdb
 
 importers:
 
@@ -76,7 +76,7 @@ importers:
         version: 4.19.2
       wa-multi-session:
         specifier: ^3.8.3
-        version: 3.8.3(patch_hash=5cf242bb68011ec08c19575c324c00b5a163dff11532e9506f7b8bf8bf321488)(debug@2.6.9)(sharp@0.35.4(@types/node@22.10.1))
+        version: 3.8.3(patch_hash=a403e372b782d64b714c1b7bdc4093e1a82a02109335bd6e0fcd96c1a95b7bdb)(debug@2.6.9)(sharp@0.35.4(@types/node@22.10.1))
       zod:
         specifier: ^3.23.8
         version: 3.23.8
@@ -2579,7 +2579,7 @@ snapshots:
 
   vary@1.1.2: {}
 
-  wa-multi-session@3.8.3(patch_hash=5cf242bb68011ec08c19575c324c00b5a163dff11532e9506f7b8bf8bf321488)(debug@2.6.9)(sharp@0.35.4(@types/node@22.10.1)):
+  wa-multi-session@3.8.3(patch_hash=a403e372b782d64b714c1b7bdc4093e1a82a02109335bd6e0fcd96c1a95b7bdb)(debug@2.6.9)(sharp@0.35.4(@types/node@22.10.1)):
     dependencies:
       '@adiwajshing/keyed-db': 0.2.4
       '@hapi/boom': 10.0.1

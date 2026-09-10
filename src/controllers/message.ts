@@ -8,6 +8,7 @@ import { basicAuthMiddleware } from "../middlewares/auth.middleware";
 import type { User } from "../database/db";
 import { messageStore } from "../utils/message-store";
 import { sessionDb } from "../database/db";
+import { registrarEnvio } from "../utils/mensagem-diagnostico";
 
 type Variables = {
   user: User;
@@ -98,6 +99,7 @@ export const createMessageController = () => {
       }
 
       const response = await whatsapp.sendTextMessage(sendOptions);
+      registrarEnvio(payload.session, response?.key?.id ?? undefined, payload.to);
 
       return c.json({
         data: response,
