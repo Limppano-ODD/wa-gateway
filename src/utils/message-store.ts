@@ -1,7 +1,7 @@
 // Simple in-memory message store for quoting functionality
 // In production, consider using a database or Redis for persistence
 
-import { MessageReceived } from "wa-multi-session";
+import type { MessageReceived } from "wa-multi-session";
 
 class MessageStore {
   private messages: Map<string, MessageReceived> = new Map();

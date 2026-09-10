@@ -4,7 +4,7 @@
 // /ingress/:tenant e a ponte WebSocket chamam o adapter do canal do tenant.
 // Assim, adicionar um canal = escrever um adapter, sem rota nova.
 
-import type { TenantDef } from "../config";
+import type { TenantDef } from "../config.ts";
 
 export interface VerifyResult {
   status: number;

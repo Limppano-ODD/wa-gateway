@@ -1,4 +1,4 @@
-import { NotFoundHandler } from "hono";
+import type { NotFoundHandler } from "hono";
 import { HTTPException } from "hono/http-exception";
 
 export const notFoundMiddleware: NotFoundHandler = (c) => {

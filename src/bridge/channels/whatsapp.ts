@@ -9,8 +9,8 @@
 //   { verifyToken, phoneNumberId, metaToken, apiVersion? }
 
 import axios from "axios";
-import type { TenantDef } from "../config";
-import type { ChannelAdapter, IngestResult, SendResult, VerifyResult } from "./types";
+import type { TenantDef } from "../config.ts";
+import type { ChannelAdapter, IngestResult, SendResult, VerifyResult } from "./types.ts";
 
 export const whatsappAdapter: ChannelAdapter = {
   name: "whatsapp",

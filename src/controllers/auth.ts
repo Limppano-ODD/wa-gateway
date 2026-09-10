@@ -3,15 +3,15 @@ import { deleteCookie, getCookie, setCookie } from "hono/cookie";
 import { randomBytes } from "crypto";
 import { readFileSync } from "fs";
 import { join } from "path";
-import { authDb } from "../database/db";
-import { env, entraConfigurado } from "../env";
+import { authDb } from "../database/db.ts";
+import { env, entraConfigurado } from "../env.ts";
 import {
   gerarPkce,
   gerarState,
   montarUrlDeLogin,
   trocarCodePorClaims,
-} from "../auth/entra";
-import { decidirAdmin, temOverageDeGrupos } from "../auth/roles";
+} from "../auth/entra.ts";
+import { decidirAdmin, temOverageDeGrupos } from "../auth/roles.ts";
 
 /**
  * Login Microsoft (Entra ID) para humano no browser.
@@ -31,7 +31,7 @@ const redirectUri = () => `${env.PUBLIC_BASE_URL.replace(/\/$/, "")}/auth/callba
 const seguro = () => env.NODE_ENV === "PRODUCTION";
 
 function pagina(arquivo: string): string {
-  return readFileSync(join(__dirname, "..", "views", arquivo), "utf-8");
+  return readFileSync(join(import.meta.dirname, "..", "views", arquivo), "utf-8");
 }
 
 export const createAuthController = () => {

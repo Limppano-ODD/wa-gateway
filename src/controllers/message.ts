@@ -1,14 +1,14 @@
 import { Hono } from "hono";
-import { createKeyMiddleware } from "../middlewares/key.middleware";
-import { requestValidator } from "../middlewares/validation.middleware";
+import { createKeyMiddleware } from "../middlewares/key.middleware.ts";
+import { requestValidator } from "../middlewares/validation.middleware.ts";
 import { z } from "zod";
 import * as whatsapp from "wa-multi-session";
 import { HTTPException } from "hono/http-exception";
-import { basicAuthMiddleware } from "../middlewares/auth.middleware";
-import type { User } from "../database/db";
-import { messageStore } from "../utils/message-store";
-import { sessionDb } from "../database/db";
-import { registrarEnvio } from "../utils/mensagem-diagnostico";
+import { basicAuthMiddleware } from "../middlewares/auth.middleware.ts";
+import type { User } from "../database/db.ts";
+import { messageStore } from "../utils/message-store.ts";
+import { sessionDb } from "../database/db.ts";
+import { registrarEnvio } from "../utils/mensagem-diagnostico.ts";
 
 type Variables = {
   user: User;

@@ -1,9 +1,10 @@
 import { Hono } from "hono";
-import { adminAuthMiddleware } from "../middlewares/auth.middleware";
-import { humanAuthMiddleware } from "../middlewares/human-auth.middleware";
-import { requestValidator } from "../middlewares/validation.middleware";
+import { adminAuthMiddleware } from "../middlewares/auth.middleware.ts";
+import { humanAuthMiddleware } from "../middlewares/human-auth.middleware.ts";
+import { requestValidator } from "../middlewares/validation.middleware.ts";
 import { z } from "zod";
-import { userDb, User } from "../database/db";
+import { userDb } from "../database/db.ts";
+import type { User } from "../database/db.ts";
 import { HTTPException } from "hono/http-exception";
 import { readFileSync } from "fs";
 import { join } from "path";
@@ -191,7 +192,7 @@ export const createAdminController = () => {
 
   // Admin UI
   app.get("/", async (c) => {
-    const htmlPath = join(__dirname, "../views/admin.html");
+    const htmlPath = join(import.meta.dirname, "../views/admin.html");
     const htmlContent = readFileSync(htmlPath, "utf-8");
     return c.html(htmlContent);
   });

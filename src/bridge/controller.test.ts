@@ -44,7 +44,7 @@ before(async () => {
       config: { verifyToken: "v", phoneNumberId: "1", metaToken: "m" },
     },
   });
-  const { createBridgeController } = await import("./controller");
+  const { createBridgeController } = await import("./controller.ts");
   app = createBridgeController();
 });
 

@@ -1,7 +1,7 @@
 import { createMiddleware } from "hono/factory";
 import { HTTPException } from "hono/http-exception";
-import { userDb } from "../database/db";
-import { env } from "../env";
+import { userDb } from "../database/db.ts";
+import { env } from "../env.ts";
 
 export const basicAuthMiddleware = () =>
   createMiddleware(async (c, next) => {

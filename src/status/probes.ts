@@ -41,7 +41,7 @@ export function hasCredentials(sessionName: string): boolean {
  */
 export function isConnected(sessionName: string): boolean {
   const session = whatsapp.getSession(sessionName) as
-    | { user?: unknown }
+    | { sock?: { user?: unknown } }
     | undefined;
-  return !!session?.user;
+  return !!session?.sock?.user;
 }

@@ -1,8 +1,8 @@
 // index.ts — registro de adapters de canal. Adicionar canal = 1 linha aqui.
 
-import type { ChannelAdapter } from "./types";
-import { whatsappAdapter } from "./whatsapp";
-import { teamsAdapter } from "./teams";
+import type { ChannelAdapter } from "./types.ts";
+import { whatsappAdapter } from "./whatsapp.ts";
+import { teamsAdapter } from "./teams.ts";
 
 const adapters: Record<string, ChannelAdapter> = {
   whatsapp: whatsappAdapter,

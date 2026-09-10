@@ -1,11 +1,12 @@
-import { MessageReceived } from "wa-multi-session";
-import { CreateWebhookProps, webhookClient } from ".";
+import type { MessageReceived } from "wa-multi-session";
+import { webhookClient } from "./index.ts";
+import type { CreateWebhookProps } from "./index.ts";
 import {
   handleWebhookAudioMessage,
   handleWebhookDocumentMessage,
   handleWebhookImageMessage,
   handleWebhookVideoMessage,
-} from "./media";
+} from "./media.ts";
 
 type WebhookMessageBody = {
   session: string;

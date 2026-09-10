@@ -1,7 +1,7 @@
 import fs from "fs";
 import path from "path";
-import db from "../database/db";
-import { env } from "../env";
+import db from "../database/db.ts";
+import { env } from "../env.ts";
 
 /**
  * Backup do sqlite.
