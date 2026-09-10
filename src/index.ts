@@ -357,10 +357,21 @@ whastapp.onDisconnected((session) => {
 // Status real de entrega (ack) por mensagem — pending → server → delivered →
 // read. É o dado que faltava pra saber se "Aguardando mensagem" resolveu
 // sozinho (chegou delivered depois) ou ficou preso (nunca saiu de pending).
-whastapp.onMessageUpdate((data) => {
-  const messageId = data.key?.id;
-  if (!messageId) return;
-  registrarStatus(data.sessionId, messageId, data.messageStatus);
+//
+// ATENÇÃO: o tipo do wa-multi-session diz que o callback recebe só 1
+// argumento (data: MessageUpdated), mas o dist real (dist/Socket/index.js)
+// chama `listener(sessionId, data)` — DOIS argumentos, pelo caminho do
+// callback registrado via onMessageUpdate. Com a assinatura de 1 argumento,
+// `data` recebia o sessionId (string) e `data.key` era sempre undefined —
+// o hook nunca processava nada, em silêncio (achei isso rodando ao vivo:
+// zero "status_atualizado" em produção, mesmo com receipts de leitura
+// chegando de verdade). Bug do runtime da lib, não d.ts confiável aqui.
+whastapp.onMessageUpdate((...args: any[]) => {
+  const data = args.length > 1 ? args[1] : args[0];
+  const messageId = data?.key?.id;
+  const sessionId = data?.sessionId;
+  if (!messageId || !sessionId) return;
+  registrarStatus(sessionId, messageId, data.messageStatus);
 });
 
 // Legacy webhook support (if WEBHOOK_BASE_URL is set, also send to that endpoint)
