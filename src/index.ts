@@ -20,6 +20,7 @@ import { createLogoutController } from "./controllers/logout";
 import { createStatusController } from "./controllers/status";
 import { createAuthController } from "./controllers/auth";
 import { scheduleBackups } from "./utils/db-backup";
+import { iniciarLimpezaPeriodica } from "./utils/limpeza-sessao-lid";
 import { createBridgeController } from "./bridge/controller";
 import { attachBridgeWebSocket } from "./bridge/ws";
 import fs from "fs";
@@ -385,3 +386,7 @@ whastapp.loadSessionsFromStorage();
 // Backup do sqlite (usuários, callbacks e tokens de webhook num arquivo só).
 // Depois do loadSessions para não competir com o boot das sessões.
 scheduleBackups();
+
+// Limpeza automática da sessão de criptografia duplicada/travada que causa
+// "Aguardando mensagem" pra sempre (ver limpeza-sessao-lid.ts).
+iniciarLimpezaPeriodica();
