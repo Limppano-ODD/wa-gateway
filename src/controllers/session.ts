@@ -1,13 +1,13 @@
 import * as whatsapp from "wa-multi-session";
 import { Hono } from "hono";
-import { requestValidator } from "../middlewares/validation.middleware";
+import { requestValidator } from "../middlewares/validation.middleware.ts";
 import { z } from "zod";
-import { createKeyMiddleware } from "../middlewares/key.middleware";
+import { createKeyMiddleware } from "../middlewares/key.middleware.ts";
 import { toDataURL } from "qrcode";
 import { HTTPException } from "hono/http-exception";
-import { basicAuthMiddleware } from "../middlewares/auth.middleware";
-import type { User } from "../database/db";
-import { setQRCode, clearQRCode } from "../utils/qr-store";
+import { basicAuthMiddleware } from "../middlewares/auth.middleware.ts";
+import type { User } from "../database/db.ts";
+import { setQRCode, clearQRCode } from "../utils/qr-store.ts";
 
 type Variables = {
   user: User;
@@ -53,15 +53,15 @@ export const createSessionController = () => {
       const payload = c.req.valid("json");
       const sessionName =
         user.is_admin === 1 && payload.session ? payload.session : user.username;
-      const sock = whatsapp.getSession(sessionName) as any;
-      if (!sock) {
+      const session = whatsapp.getSession(sessionName) as any;
+      if (!session) {
         throw new HTTPException(400, { message: "Session not connected" });
       }
       const jids = payload.phones
         .map((p) => String(p).replace(/\D/g, ""))
         .filter((d) => d.length >= 10)
         .map((d) => `${d}@s.whatsapp.net`);
-      const results = (await sock.onWhatsApp(...jids)) || [];
+      const results = (await session.sock.onWhatsApp(...jids)) || [];
       // `split` sempre devolve ao menos um elemento, mas com
       // noUncheckedIndexedAccess o tipo de [0] e `string | undefined`. O `??`
       // satisfaz o compilador sem mudar o comportamento.

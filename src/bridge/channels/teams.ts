@@ -14,8 +14,8 @@
 import { randomUUID } from "node:crypto";
 import axios from "axios";
 import { createRemoteJWKSet, jwtVerify } from "jose";
-import type { TenantDef } from "../config";
-import type { ChannelAdapter, IngestResult, SendResult } from "./types";
+import type { TenantDef } from "../config.ts";
+import type { ChannelAdapter, IngestResult, SendResult } from "./types.ts";
 
 // JWKS do Bot Connector (chaves públicas pra validar o JWT que o Teams manda).
 // OpenID metadata: https://login.botframework.com/v1/.well-known/openidconfiguration

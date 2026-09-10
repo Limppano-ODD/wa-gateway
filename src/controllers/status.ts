@@ -1,10 +1,10 @@
 import { Hono } from "hono";
-import { sessionDb } from "../database/db";
-import { env } from "../env";
-import { statusTokenMiddleware } from "../middlewares/status-token.middleware";
-import { buildSessionStatus, buildStatusReport } from "../status/report";
-import type { ReportDeps } from "../status/report";
-import { hasCredentials, isConnected } from "../status/probes";
+import { sessionDb } from "../database/db.ts";
+import { env } from "../env.ts";
+import { statusTokenMiddleware } from "../middlewares/status-token.middleware.ts";
+import { buildSessionStatus, buildStatusReport } from "../status/report.ts";
+import type { ReportDeps } from "../status/report.ts";
+import { hasCredentials, isConnected } from "../status/probes.ts";
 
 /**
  * Endpoints de verdade sobre as sessões, para o Gatus consumir com condição

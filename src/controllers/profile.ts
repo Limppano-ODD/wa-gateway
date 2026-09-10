@@ -1,12 +1,12 @@
 import * as whatsapp from "wa-multi-session";
 import { Hono } from "hono";
-import { requestValidator } from "../middlewares/validation.middleware";
+import { requestValidator } from "../middlewares/validation.middleware.ts";
 import { z } from "zod";
-import { createKeyMiddleware } from "../middlewares/key.middleware";
+import { createKeyMiddleware } from "../middlewares/key.middleware.ts";
 import { toDataURL } from "qrcode";
 import { HTTPException } from "hono/http-exception";
-import { basicAuthMiddleware } from "../middlewares/auth.middleware";
-import type { User } from "../database/db";
+import { basicAuthMiddleware } from "../middlewares/auth.middleware.ts";
+import type { User } from "../database/db.ts";
 
 type Variables = {
   user: User;

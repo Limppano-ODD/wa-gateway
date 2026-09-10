@@ -1,9 +1,9 @@
 import { createMiddleware } from "hono/factory";
 import { getCookie } from "hono/cookie";
-import { authDb, type User } from "../database/db";
-import { env, entraConfigurado } from "../env";
-import { basicAuthMiddleware } from "./auth.middleware";
-import { COOKIE_SESSAO } from "../controllers/auth";
+import { authDb, type User } from "../database/db.ts";
+import { env, entraConfigurado } from "../env.ts";
+import { basicAuthMiddleware } from "./auth.middleware.ts";
+import { COOKIE_SESSAO } from "../controllers/auth.ts";
 
 /**
  * Autenticação de HUMANO no browser: sessão do Entra primeiro, Basic depois.

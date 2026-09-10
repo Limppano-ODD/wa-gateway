@@ -33,8 +33,8 @@ before(async () => {
     },
   });
   // import dinâmico: o módulo lê o env no load, então o env tem que estar pronto.
-  cfg = await import("./config");
-  hub = await import("./hub");
+  cfg = await import("./config.ts");
+  hub = await import("./hub.ts");
 });
 
 after(() => rmSync(dir, { recursive: true, force: true }));

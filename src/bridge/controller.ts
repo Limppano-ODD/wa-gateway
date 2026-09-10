@@ -17,10 +17,10 @@ import {
   removerTenant,
   tenant as tenantDef,
   tenantByWsToken,
-} from "./config";
-import { adapterFor } from "./channels";
-import { bridgeHub } from "./hub";
-import { env } from "../env";
+} from "./config.ts";
+import { adapterFor } from "./channels/index.ts";
+import { bridgeHub } from "./hub.ts";
+import { env } from "../env.ts";
 
 // Teto do corpo das rotas admin, em bytes. A config de um tenant tem meia dúzia
 // de campos curtos — 16 KB é ~100x o tamanho real.
