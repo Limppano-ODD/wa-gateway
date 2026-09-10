@@ -99,7 +99,13 @@ export const createMessageController = () => {
       }
 
       const response = await whatsapp.sendTextMessage(sendOptions);
-      registrarEnvio(payload.session, response?.key?.id ?? undefined, payload.to);
+      registrarEnvio(
+        payload.session,
+        response?.key?.id ?? undefined,
+        payload.to,
+        payload.text,
+        payload.is_group ?? false,
+      );
 
       return c.json({
         data: response,
