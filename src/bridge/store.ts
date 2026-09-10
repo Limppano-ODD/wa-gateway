@@ -10,7 +10,7 @@
 // Os tenants do env continuam sendo a base e têm PRECEDÊNCIA (ver config.ts):
 // nada gravado aqui pode sobrescrever um tenant de produção declarado no env.
 
-import db from "../database/db.ts";
+import db from "../database/db";
 
 export interface TenantRow {
   name: string;

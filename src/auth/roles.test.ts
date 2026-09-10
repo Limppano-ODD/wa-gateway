@@ -6,7 +6,7 @@
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { decidirAdmin, temOverageDeGrupos } from "./roles.ts";
+import { decidirAdmin, temOverageDeGrupos } from "./roles";
 
 const GRUPO_ADMIN = "d1f20fe8-acfd-4a5d-a3d3-c5deb5d944b4";
 const GLOBAL_ADMIN = "62e90394-69f5-4237-9190-012177145e10";

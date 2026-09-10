@@ -23,7 +23,7 @@ export const createLogoutController = () => {
   const app = new Hono();
 
   app.get("/", (c) => {
-    const html = readFileSync(join(import.meta.dirname, "../views/logout.html"), "utf-8");
+    const html = readFileSync(join(__dirname, "../views/logout.html"), "utf-8");
 
     // Resposta montada à mão em vez de `throw new HTTPException(401)`: o
     // globalErrorMiddleware devolveria JSON e o WWW-Authenticate se perderia

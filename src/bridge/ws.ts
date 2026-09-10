@@ -4,9 +4,9 @@
 
 import { WebSocketServer, type WebSocket } from "ws";
 import type { Server } from "node:http";
-import { tenant as tenantDef, tenantByWsToken } from "./config.ts";
-import { adapterFor } from "./channels/index.ts";
-import { bridgeHub } from "./hub.ts";
+import { tenant as tenantDef, tenantByWsToken } from "./config";
+import { adapterFor } from "./channels";
+import { bridgeHub } from "./hub";
 
 export function attachBridgeWebSocket(server: Server): void {
   // noServer + upgrade manual (o @hono/node-server engoliria o upgrade → 404).

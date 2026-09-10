@@ -2,31 +2,31 @@ import { Hono } from "hono";
 import { logger } from "hono/logger";
 import { cors } from "hono/cors";
 import moment from "moment";
-import { globalErrorMiddleware } from "./middlewares/error.middleware.ts";
-import { notFoundMiddleware } from "./middlewares/notfound.middleware.ts";
+import { globalErrorMiddleware } from "./middlewares/error.middleware";
+import { notFoundMiddleware } from "./middlewares/notfound.middleware";
 import { serve } from "@hono/node-server";
-import { env } from "./env.ts";
-import { createSessionController } from "./controllers/session.ts";
+import { env } from "./env";
+import { createSessionController } from "./controllers/session";
 import * as whastapp from "wa-multi-session";
-import { createMessageController } from "./controllers/message.ts";
-import type { CreateWebhookProps } from "./webhooks/index.ts";
-import { createWebhookMessage } from "./webhooks/message.ts";
-import { createWebhookSession } from "./webhooks/session.ts";
-import { createProfileController } from "./controllers/profile.ts";
+import { createMessageController } from "./controllers/message";
+import { CreateWebhookProps } from "./webhooks";
+import { createWebhookMessage } from "./webhooks/message";
+import { createWebhookSession } from "./webhooks/session";
+import { createProfileController } from "./controllers/profile";
 import { serveStatic } from "@hono/node-server/serve-static";
-import { createAdminController } from "./controllers/admin.ts";
-import { createDashboardController } from "./controllers/dashboard.ts";
-import { createLogoutController } from "./controllers/logout.ts";
-import { createStatusController } from "./controllers/status.ts";
-import { createAuthController } from "./controllers/auth.ts";
-import { scheduleBackups } from "./utils/db-backup.ts";
-import { createBridgeController } from "./bridge/controller.ts";
-import { attachBridgeWebSocket } from "./bridge/ws.ts";
+import { createAdminController } from "./controllers/admin";
+import { createDashboardController } from "./controllers/dashboard";
+import { createLogoutController } from "./controllers/logout";
+import { createStatusController } from "./controllers/status";
+import { createAuthController } from "./controllers/auth";
+import { scheduleBackups } from "./utils/db-backup";
+import { createBridgeController } from "./bridge/controller";
+import { attachBridgeWebSocket } from "./bridge/ws";
 import fs from "fs";
 import path from "path";
-import { registrarReconexao, zerarReconexao, registrarStatus } from "./utils/mensagem-diagnostico.ts";
+import { registrarReconexao, zerarReconexao, registrarStatus } from "./utils/mensagem-diagnostico";
 // Initialize database
-import "./database/db.ts";
+import "./database/db";
 
 
 
@@ -51,7 +51,7 @@ app.notFound(notFoundMiddleware);
  */
 app.get("/", (c) => {
   const indexHtml = fs.readFileSync(
-    path.join(import.meta.dirname, "views", "index.html"),
+    path.join(__dirname, "views", "index.html"),
     "utf-8"
   );
   return c.html(indexHtml);
@@ -135,12 +135,11 @@ whastapp.onConnected((session) => {
 });
 
 // Implement Per-User Webhook
-import { userDb, sessionDb } from "./database/db.ts";
-import type { User } from "./database/db.ts";
+import { User, userDb, sessionDb } from "./database/db";
 import axios from "axios";
-import type { MessageReceived } from "wa-multi-session";
-import { messageStore } from "./utils/message-store.ts";
-import { getWebhookAuthHeaders } from "./utils/webhook-auth.ts";
+import { MessageReceived } from "wa-multi-session";
+import { messageStore } from "./utils/message-store";
+import { getWebhookAuthHeaders } from "./utils/webhook-auth";
 
 // Helper function to get user for a session
 // Since session names now always match usernames, we look up by username

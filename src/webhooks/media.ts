@@ -1,4 +1,4 @@
-import type { MessageReceived } from "wa-multi-session";
+import { MessageReceived } from "wa-multi-session";
 
 const baseMediaPath = "./media/";
 

@@ -1,13 +1,13 @@
 import { Hono } from "hono";
-import { basicAuthMiddleware } from "../middlewares/auth.middleware.ts";
-import type { User } from "../database/db.ts";
+import { basicAuthMiddleware } from "../middlewares/auth.middleware";
+import type { User } from "../database/db";
 import * as whatsapp from "wa-multi-session";
 import { toDataURL } from "qrcode";
 import { HTTPException } from "hono/http-exception";
-import { userDb } from "../database/db.ts";
-import { requestValidator } from "../middlewares/validation.middleware.ts";
+import { userDb } from "../database/db";
+import { requestValidator } from "../middlewares/validation.middleware";
 import { z } from "zod";
-import { getQRCode, setQRCode, clearQRCode } from "../utils/qr-store.ts";
+import { getQRCode, setQRCode, clearQRCode } from "../utils/qr-store";
 
 type Variables = {
   user: User;
@@ -117,7 +117,7 @@ export const createDashboardController = () => {
     const sessionName = user.username;
     const session = whatsapp.getSession(sessionName);
     // Check if session exists AND is authenticated (has user info)
-    const isConnected = !!(session?.sock?.user);
+    const isConnected = !!(session?.user);
 
     return c.json({
       data: {
@@ -262,7 +262,7 @@ export const createDashboardController = () => {
     
     const { readFileSync } = await import("fs");
     const { join } = await import("path");
-    const htmlPath = join(import.meta.dirname, "../views/dashboard.html");
+    const htmlPath = join(__dirname, "../views/dashboard.html");
     let htmlContent = readFileSync(htmlPath, "utf-8");
     
     // Replace username placeholder

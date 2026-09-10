@@ -8,8 +8,8 @@
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import type { SessionRow } from "../database/db.ts";
-import { buildStatusReport, parseSqliteUtc } from "./report.ts";
+import type { SessionRow } from "../database/db";
+import { buildStatusReport, parseSqliteUtc } from "./report";
 
 const AGORA = new Date("2026-08-10T14:00:00.000Z");
 
