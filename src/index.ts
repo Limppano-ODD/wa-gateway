@@ -26,7 +26,6 @@ import { attachBridgeWebSocket } from "./bridge/ws";
 import fs from "fs";
 import path from "path";
 import { registrarReconexao, zerarReconexao, registrarStatus } from "./utils/mensagem-diagnostico";
-import { iniciarAutoCuraMensagemPresa } from "./utils/auto-cura-mensagem-presa";
 // Initialize database
 import "./database/db";
 
@@ -389,12 +388,5 @@ whastapp.loadSessionsFromStorage();
 scheduleBackups();
 
 // Limpeza automática da sessão de criptografia duplicada/travada que causa
-// "Aguardando mensagem" pra sempre (ver limpeza-sessao-lid.ts). Varredura
-// periódica, pega o que sobrar.
+// "Aguardando mensagem" pra sempre (ver limpeza-sessao-lid.ts).
 iniciarLimpezaPeriodica();
-
-// Auto-cura: detecta a MENSAGEM presa na hora (60s sem confirmar entrega) e
-// já limpa + reenvia essa mensagem específica, sem esperar a varredura
-// periódica e sem ninguém precisar mandar de novo na mão (ver
-// auto-cura-mensagem-presa.ts).
-iniciarAutoCuraMensagemPresa();
