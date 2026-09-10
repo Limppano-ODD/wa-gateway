@@ -24,6 +24,7 @@ import { createBridgeController } from "./bridge/controller";
 import { attachBridgeWebSocket } from "./bridge/ws";
 import fs from "fs";
 import path from "path";
+import { registrarReconexao, zerarReconexao, registrarStatus } from "./utils/mensagem-diagnostico";
 // Initialize database
 import "./database/db";
 
@@ -335,17 +336,31 @@ const registrarEstado = (session: string, state: string) => {
 
 whastapp.onConnected((session) => {
   registrarEstado(session, "connected");
+  zerarReconexao(session);
   sendSessionWebhook(session, "connected");
 });
 
 whastapp.onConnecting((session) => {
   registrarEstado(session, "connecting");
+  // Cada "connecting" depois de já ter conectado alguma vez é uma reconexão —
+  // sinal de instabilidade que ajuda a explicar mensagem que ficou presa
+  // (enviada bem na hora que a sessão estava trocando de chave).
+  registrarReconexao(session);
   sendSessionWebhook(session, "connecting");
 });
 
 whastapp.onDisconnected((session) => {
   registrarEstado(session, "disconnected");
   sendSessionWebhook(session, "disconnected");
+});
+
+// Status real de entrega (ack) por mensagem — pending → server → delivered →
+// read. É o dado que faltava pra saber se "Aguardando mensagem" resolveu
+// sozinho (chegou delivered depois) ou ficou preso (nunca saiu de pending).
+whastapp.onMessageUpdate((data) => {
+  const messageId = data.key?.id;
+  if (!messageId) return;
+  registrarStatus(data.sessionId, messageId, data.messageStatus);
 });
 
 // Legacy webhook support (if WEBHOOK_BASE_URL is set, also send to that endpoint)
