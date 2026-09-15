@@ -182,6 +182,47 @@
             background: #ffd700;
             color: #333;
         }
+
+        .badge.online {
+            background: #d4edda;
+            color: #155724;
+        }
+
+        .badge.offline {
+            background: #e2e3e5;
+            color: #383d41;
+        }
+
+        .badge.evento-conectou {
+            background: #d4edda;
+            color: #155724;
+        }
+
+        .badge.evento-saiu {
+            background: #fff3cd;
+            color: #856404;
+        }
+
+        .badge.evento-derrubado {
+            background: #f8d7da;
+            color: #721c24;
+        }
+
+        .badge.evento-entrega_falhou {
+            background: #f8d7da;
+            color: #721c24;
+        }
+
+        .btn-refresh {
+            background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+            padding: 6px 14px;
+            font-size: 12px;
+        }
+
+        .muted {
+            color: #888;
+            font-size: 12px;
+        }
     </style>
 </head>
 <body>
@@ -246,6 +287,46 @@
             </form>
         </div>
         
+        <div class="card">
+            <h2>🌉 Bridge — Tenants (Teams / WhatsApp)
+                <button class="btn-refresh" onclick="loadBridge()" style="float:right">🔄 Atualizar</button>
+            </h2>
+            <div id="bridgeMessage"></div>
+            <table id="bridgeTenantsTable">
+                <thead>
+                    <tr>
+                        <th>Nome</th>
+                        <th>Canal</th>
+                        <th>Origem</th>
+                        <th>Status</th>
+                        <th>Pontes abertas</th>
+                    </tr>
+                </thead>
+                <tbody id="bridgeTenantsBody">
+                    <tr><td colspan="5" style="text-align: center;">Carregando...</td></tr>
+                </tbody>
+            </table>
+        </div>
+
+        <div class="card">
+            <h2>📜 Bridge — Transições recentes</h2>
+            <p class="muted" style="margin-bottom: 10px;">Conexão/desconexão de cada app, mais recente primeiro. Some ao reiniciar o gateway — é diagnóstico, não auditoria permanente.</p>
+            <table id="bridgeEventosTable">
+                <thead>
+                    <tr>
+                        <th>Quando</th>
+                        <th>App</th>
+                        <th>Evento</th>
+                        <th>Pontes</th>
+                        <th>Motivo</th>
+                    </tr>
+                </thead>
+                <tbody id="bridgeEventosBody">
+                    <tr><td colspan="5" style="text-align: center;">Carregando...</td></tr>
+                </tbody>
+            </table>
+        </div>
+
         <div class="card">
             <h2>👥 Users</h2>
             <div id="usersMessage"></div>
@@ -487,8 +568,59 @@
             }
         }
         
+        const EVENTO_LABEL = {
+            conectou: 'conectou',
+            saiu: 'saiu',
+            derrubado: 'derrubado (credencial trocada/tenant removido)',
+            entrega_falhou: 'mensagem chegou, app offline'
+        };
+
+        async function loadBridge() {
+            try {
+                const response = await fetch('/admin/bridge', { credentials: 'include' });
+                const data = await response.json();
+
+                const tenantsBody = document.getElementById('bridgeTenantsBody');
+                if (!data.tenants || data.tenants.length === 0) {
+                    tenantsBody.innerHTML = '<tr><td colspan="5" style="text-align: center;">Nenhum tenant cadastrado</td></tr>';
+                } else {
+                    tenantsBody.innerHTML = data.tenants.map(t => {
+                        const pontes = data.online[t.name] || 0;
+                        const online = pontes > 0;
+                        return `
+                            <tr>
+                                <td>${t.name}</td>
+                                <td>${t.channel}</td>
+                                <td>${t.origem}</td>
+                                <td><span class="badge ${online ? 'online' : 'offline'}">${online ? 'online' : 'offline'}</span></td>
+                                <td>${pontes}</td>
+                            </tr>
+                        `;
+                    }).join('');
+                }
+
+                const eventosBody = document.getElementById('bridgeEventosBody');
+                if (!data.eventos || data.eventos.length === 0) {
+                    eventosBody.innerHTML = '<tr><td colspan="5" style="text-align: center;">Sem eventos desde o último restart</td></tr>';
+                } else {
+                    eventosBody.innerHTML = data.eventos.map(e => `
+                        <tr>
+                            <td>${new Date(e.timestamp).toLocaleString()}</td>
+                            <td>${e.app}</td>
+                            <td><span class="badge evento-${e.evento}">${EVENTO_LABEL[e.evento] || e.evento}</span></td>
+                            <td>${e.pontesRestantes}</td>
+                            <td>${e.motivo || '-'}</td>
+                        </tr>
+                    `).join('');
+                }
+            } catch (error) {
+                showMessage('bridgeMessage', 'Falha ao carregar bridge: ' + error.message, 'error');
+            }
+        }
+
         // Load users on page load
         loadUsers();
+        loadBridge();
     </script>
 </body>
 </html>

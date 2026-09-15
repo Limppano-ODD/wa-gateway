@@ -7,6 +7,8 @@ import { userDb, User } from "../database/db";
 import { HTTPException } from "hono/http-exception";
 import { readFileSync } from "fs";
 import { join } from "path";
+import { bridgeHub } from "../bridge/hub";
+import { listarTenants } from "../bridge/config";
 
 
 type Variables = {
@@ -186,6 +188,19 @@ export const createAdminController = () => {
       data: {
         message: "User deleted successfully",
       },
+    });
+  });
+
+  // Bridge (Teams/WhatsApp) — tenants cadastrados, quem tá online agora, e
+  // histórico recente de conexão/desconexão. Weslan pediu (15/09/2026) depois
+  // de precisar caçar isso na mão via SSH+docker logs pra diagnosticar o bot
+  // "industrial" ficando instável — visibilidade que já existia como dado
+  // (bridgeHub.status(), listarTenants()) mas não tinha tela nenhuma.
+  app.get("/bridge", async (c) => {
+    return c.json({
+      tenants: listarTenants(),
+      online: bridgeHub.status(),
+      eventos: bridgeHub.historico(),
     });
   });
 
