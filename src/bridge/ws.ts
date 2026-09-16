@@ -7,6 +7,7 @@ import type { Server } from "node:http";
 import { tenant as tenantDef, tenantByWsToken } from "./config";
 import { adapterFor } from "./channels";
 import { bridgeHub } from "./hub";
+import { confirmar, varrerPendentes } from "./outbox";
 
 export function attachBridgeWebSocket(server: Server): void {
   // noServer + upgrade manual (o @hono/node-server engoliria o upgrade → 404).
@@ -39,17 +40,13 @@ export function attachBridgeWebSocket(server: Server): void {
     bridgeHub.registrar(name, socket);
     socket.send(JSON.stringify({ type: "welcome", tenant: name }));
 
-    // Keepalive: ping a cada 30s pra não deixar o ALB derrubar a conexão idle
-    // (idle timeout ~60s). Sem isso a ponte cai/reconecta e mensagem no gap se perde.
-    const pingTimer = setInterval(() => {
-      if (socket.readyState === 1) {
-        try {
-          socket.ping();
-        } catch {
-          /* socket morrendo — o close handler limpa */
-        }
-      }
-    }, 30_000);
+    // Reconectou — reforça o que ainda tá pendente na fila (ver
+    // bridge/outbox.ts). Cobre exatamente o caso que gerou o pedido: app
+    // ficou offline/zumbi, mensagem chegou nesse meio-tempo e ficou perdida
+    // — com a fila, ela espera aqui até uma ponte de verdade aparecer.
+    varrerPendentes(name);
+
+    const pingTimer = iniciarHeartbeat(socket);
 
     socket.on("message", (raw) => {
       let msg: any;
@@ -59,6 +56,12 @@ export function attachBridgeWebSocket(server: Server): void {
         return;
       }
       if (msg?.type === "send") void enviar(name, msg, socket);
+      // Ack opcional da fila (ver bridge/outbox.ts) — agente ainda não manda
+      // isso hoje (cliente WS do agent-platform não implementa), mas aceitar
+      // já deixa pronto pra quando mandar: marca delivered na hora e o sweep
+      // para de reenviar essa mensagem, em vez de depender só do teto de
+      // tentativas/TTL.
+      if (msg?.type === "ack" && typeof msg.ref === "number") confirmar(msg.ref);
     });
 
     const cleanup = () => {
@@ -70,6 +73,50 @@ export function attachBridgeWebSocket(server: Server): void {
   });
 
   console.log("[bridge.ws] ponte WebSocket em /bridge/agent");
+}
+
+// Mínimo do que iniciarHeartbeat precisa de um socket — assim o teste usa um
+// fake em vez de subir um servidor WebSocket real só pra testar timer.
+export interface SocketComPingPong {
+  readyState: number;
+  on(evento: "pong", cb: () => void): unknown;
+  ping(): void;
+  terminate(): void;
+}
+
+// Keepalive + detecção de socket morto. Duas coisas numa: (1) ping periódico
+// pra não deixar o ALB derrubar a conexão idle (idle timeout ~60s, daí os 30s
+// default); (2) se o PONG não voltou desde o último ping, o socket é zumbi —
+// terminate() força o 'close' e o hub esquece dele.
+//
+// Sem (2), um agente que morre abrupto (kill -9, OOM, crash de container)
+// nunca dispara 'close'/'error' do lado do servidor — o TCP FIN não chega. O
+// socket fica pra sempre no Set do hub contando como "ponte aberta", e
+// `entregar()` manda mensagem pra ele como se fosse real (ela simplesmente vai
+// pro vazio, sem erro nenhum). Visto ao vivo 15/09/2026: agent-industrial
+// reiniciou várias vezes (instabilidade do Secrets Manager) e acabou com 3
+// "pontes abertas" quando só devia ter 1 — as outras 2 eram exatamente isso.
+//
+// `intervaloMs` é parâmetro (não constante fixa) só pra o teste rodar sem
+// esperar 30s de verdade — produção sempre usa o default.
+export function iniciarHeartbeat(socket: SocketComPingPong, intervaloMs = 30_000): NodeJS.Timeout {
+  let vivo = true;
+  socket.on("pong", () => {
+    vivo = true;
+  });
+  return setInterval(() => {
+    if (socket.readyState !== 1 /* OPEN */) return;
+    if (!vivo) {
+      socket.terminate(); // dispara 'close' -> cleanup() de quem chamou
+      return;
+    }
+    vivo = false;
+    try {
+      socket.ping();
+    } catch {
+      /* socket morrendo — o close handler limpa */
+    }
+  }, intervaloMs);
 }
 
 async function enviar(name: string, msg: any, socket: WebSocket): Promise<void> {

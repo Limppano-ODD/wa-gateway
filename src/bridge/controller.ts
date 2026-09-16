@@ -20,6 +20,7 @@ import {
 } from "./config";
 import { adapterFor } from "./channels";
 import { bridgeHub } from "./hub";
+import { enfileirarEEntregar, estatisticas as estatisticasFila } from "./outbox";
 import { env } from "../env";
 
 // Teto do corpo das rotas admin, em bytes. A config de um tenant tem meia dúzia
@@ -163,8 +164,8 @@ export const createBridgeController = () => {
       // app e possivelmente resposta duplicada pro cliente. O canal já recebeu a
       // mensagem; falha na ponte é problema nosso, não motivo pra pedir reenvio.
       try {
-        const n = bridgeHub.entregar(name, { type: "message", ...(result.push as object) });
-        console.log(`[bridge] ${adapter.name} → tenant "${name}" (${n} ponte(s))`);
+        const { id, entreguesAgora } = enfileirarEEntregar(name, { type: "message", ...(result.push as object) });
+        console.log(`[bridge] ${adapter.name} → tenant "${name}" (${entreguesAgora} ponte(s), fila#${id ?? "-"})`);
       } catch (e: any) {
         console.error(`[bridge] falha entregando na ponte de ${name}:`, e?.message || e);
       }
