@@ -300,10 +300,11 @@
                         <th>Origem</th>
                         <th>Status</th>
                         <th>Pontes abertas</th>
+                        <th>Fila</th>
                     </tr>
                 </thead>
                 <tbody id="bridgeTenantsBody">
-                    <tr><td colspan="5" style="text-align: center;">Carregando...</td></tr>
+                    <tr><td colspan="6" style="text-align: center;">Carregando...</td></tr>
                 </tbody>
             </table>
         </div>
@@ -582,11 +583,16 @@
 
                 const tenantsBody = document.getElementById('bridgeTenantsBody');
                 if (!data.tenants || data.tenants.length === 0) {
-                    tenantsBody.innerHTML = '<tr><td colspan="5" style="text-align: center;">Nenhum tenant cadastrado</td></tr>';
+                    tenantsBody.innerHTML = '<tr><td colspan="6" style="text-align: center;">Nenhum tenant cadastrado</td></tr>';
                 } else {
                     tenantsBody.innerHTML = data.tenants.map(t => {
                         const pontes = data.online[t.name] || 0;
                         const online = pontes > 0;
+                        const fila = (data.fila && data.fila[t.name]) || { pending: 0, failed: 0 };
+                        const filaTxt = (fila.pending || fila.failed)
+                            ? `${fila.pending} pendente${fila.pending === 1 ? '' : 's'}${fila.failed ? `, ${fila.failed} falhou` : ''}`
+                            : '—';
+                        const filaClasse = fila.failed ? 'evento-entrega_falhou' : (fila.pending ? 'evento-saiu' : '');
                         return `
                             <tr>
                                 <td>${t.name}</td>
@@ -594,6 +600,7 @@
                                 <td>${t.origem}</td>
                                 <td><span class="badge ${online ? 'online' : 'offline'}">${online ? 'online' : 'offline'}</span></td>
                                 <td>${pontes}</td>
+                                <td>${filaClasse ? `<span class="badge ${filaClasse}">${filaTxt}</span>` : filaTxt}</td>
                             </tr>
                         `;
                     }).join('');

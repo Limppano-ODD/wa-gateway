@@ -7,6 +7,7 @@ import type { Server } from "node:http";
 import { tenant as tenantDef, tenantByWsToken } from "./config";
 import { adapterFor } from "./channels";
 import { bridgeHub } from "./hub";
+import { confirmar, varrerPendentes } from "./outbox";
 
 export function attachBridgeWebSocket(server: Server): void {
   // noServer + upgrade manual (o @hono/node-server engoliria o upgrade → 404).
@@ -39,6 +40,12 @@ export function attachBridgeWebSocket(server: Server): void {
     bridgeHub.registrar(name, socket);
     socket.send(JSON.stringify({ type: "welcome", tenant: name }));
 
+    // Reconectou — reforça o que ainda tá pendente na fila (ver
+    // bridge/outbox.ts). Cobre exatamente o caso que gerou o pedido: app
+    // ficou offline/zumbi, mensagem chegou nesse meio-tempo e ficou perdida
+    // — com a fila, ela espera aqui até uma ponte de verdade aparecer.
+    varrerPendentes(name);
+
     const pingTimer = iniciarHeartbeat(socket);
 
     socket.on("message", (raw) => {
@@ -49,6 +56,12 @@ export function attachBridgeWebSocket(server: Server): void {
         return;
       }
       if (msg?.type === "send") void enviar(name, msg, socket);
+      // Ack opcional da fila (ver bridge/outbox.ts) — agente ainda não manda
+      // isso hoje (cliente WS do agent-platform não implementa), mas aceitar
+      // já deixa pronto pra quando mandar: marca delivered na hora e o sweep
+      // para de reenviar essa mensagem, em vez de depender só do teto de
+      // tentativas/TTL.
+      if (msg?.type === "ack" && typeof msg.ref === "number") confirmar(msg.ref);
     });
 
     const cleanup = () => {

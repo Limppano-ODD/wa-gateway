@@ -9,6 +9,7 @@ import { readFileSync } from "fs";
 import { join } from "path";
 import { bridgeHub } from "../bridge/hub";
 import { listarTenants } from "../bridge/config";
+import { estatisticas as estatisticasFila } from "../bridge/outbox";
 
 
 type Variables = {
@@ -201,6 +202,10 @@ export const createAdminController = () => {
       tenants: listarTenants(),
       online: bridgeHub.status(),
       eventos: bridgeHub.historico(),
+      // fila: mensagem pendente/desistida por tenant (ver bridge/outbox.ts) —
+      // "pending > 0 há um tempo" é o sinal direto de "esse bot não tá
+      // respondendo", sem precisar caçar em log.
+      fila: estatisticasFila(),
     });
   });
 

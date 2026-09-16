@@ -22,6 +22,7 @@ import { createAuthController } from "./controllers/auth";
 import { scheduleBackups } from "./utils/db-backup";
 import { createBridgeController } from "./bridge/controller";
 import { attachBridgeWebSocket } from "./bridge/ws";
+import { iniciarSweep } from "./bridge/outbox";
 import fs from "fs";
 import path from "path";
 import { registrarReconexao, zerarReconexao, registrarStatus } from "./utils/mensagem-diagnostico";
@@ -129,6 +130,11 @@ const server = serve(
 
 // Anexa a ponte WebSocket genérica ao mesmo http.Server (path /bridge/agent).
 attachBridgeWebSocket(server as unknown as import("node:http").Server);
+
+// Retry da fila de mensagens pra agente (ver bridge/outbox.ts) — pendente por
+// causa de ponte offline/zumbi é reenviado periodicamente até confirmar ou
+// esgotar o teto.
+iniciarSweep();
 
 whastapp.onConnected((session) => {
   console.log(`session: '${session}' connected`);
