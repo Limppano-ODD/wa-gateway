@@ -107,13 +107,17 @@ export function enfileirarEEntregar(tenant: string, payload: Record<string, unkn
   const envelope = { ...payload, ref: id };
   const n = bridgeHub.entregar(tenant, envelope);
   if (n > 0) {
+    // Entregou pra pelo menos 1 ponte ABERTA agora = bom o suficiente. Sem
+    // isso o sweep reenviava a MESMA mensagem a cada 20s pra sempre (até o
+    // teto de 8 tentativas), porque sem ack do agente nada nunca marcava
+    // delivered — bug real visto ao vivo 17/09/2026: agente Teams (canal de
+    // diretoria) respondeu a MESMA pergunta 5x seguidas, uma por sweep, com a
+    // ponte saudável o tempo todo. Retry é pra quando entregar() dá 0 (app
+    // offline/zumbi) — depois que já entregou uma vez, reenviar só piora.
     db.prepare(
-      `UPDATE bridge_outbox SET attempts = attempts + 1, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
+      `UPDATE bridge_outbox SET status = 'delivered', attempts = attempts + 1, delivered_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
     ).run(id);
   }
-  // NÃO marca delivered só por n>0 — sem ack, "mandou pro socket" não prova
-  // que o agente recebeu. Fica pending pro sweep reforçar; se o agente algum
-  // dia confirmar via confirmar(id), sai da fila na hora.
   return { id, entreguesAgora: n };
 }
 
@@ -162,8 +166,10 @@ export function varrerPendentes(tenantEspecifico?: string): void {
 
     const n = bridgeHub.entregar(row.tenant, { ...payload, ref: row.id });
     if (n > 0) {
+      // Mesma lógica de enfileirarEEntregar: entregou pra ponte aberta agora
+      // = para de reenviar. Ver comentário lá pro caso real que isso corrige.
       db.prepare(
-        `UPDATE bridge_outbox SET attempts = attempts + 1, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
+        `UPDATE bridge_outbox SET status = 'delivered', attempts = attempts + 1, delivered_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
       ).run(row.id);
     }
   }

@@ -41,37 +41,49 @@ test("mensagem pra tenant offline fica pending na fila (não desaparece mais)", 
   assert.equal(stats["app-sem-ponte"]?.pending, 1);
 });
 
-test("mensagem pra tenant online entrega na hora, mas continua pending até confirmar", () => {
+test("mensagem pra tenant online entrega na hora e já marca delivered — não fica pending", () => {
   const s = new FakeSocket();
   hub.bridgeHub.registrar("app-online", s as any);
 
   const r = outbox.enfileirarEEntregar("app-online", { texto: "oi" });
   assert.equal(r.entreguesAgora, 1);
   assert.equal(s.sent.length, 1);
-  // envelope carrega o ref (id da fila) pro agente poder confirmar depois
+  // envelope carrega o ref (id da fila) — útil se o agente algum dia confirmar
   const enviado = JSON.parse(s.sent[0]!);
   assert.equal(enviado.ref, r.id);
 
-  // sem ack, segue pending — é isso que o sweep vai reforçar depois
-  assert.equal(outbox.estatisticas()["app-online"]?.pending, 1);
+  // entregou pra ponte aberta = bom o suficiente, não fica pendente
+  assert.equal(outbox.estatisticas()["app-online"], undefined);
 
   hub.bridgeHub.remover("app-online", s as any);
 });
 
-test("confirmar() tira da fila — sweep para de reenviar essa mensagem", () => {
+test("mensagem já entregue NÃO é reenviada pelo sweep — caso real do industrial respondendo 5x (17/09/2026)", () => {
   const s = new FakeSocket();
-  hub.bridgeHub.registrar("app-ack", s as any);
-  const r = outbox.enfileirarEEntregar("app-ack", { texto: "oi" });
+  hub.bridgeHub.registrar("app-nao-duplica", s as any);
+
+  outbox.enfileirarEEntregar("app-nao-duplica", { texto: "oi" });
+  assert.equal(s.sent.length, 1);
+
+  // ponte segue saudável (nunca caiu) — sweep rodando várias vezes não deve
+  // reenviar a mesma mensagem, porque já foi marcada delivered no primeiro envio.
+  for (let i = 0; i < 10; i++) outbox.varrerPendentes("app-nao-duplica");
+  assert.equal(s.sent.length, 1);
+
+  hub.bridgeHub.remover("app-nao-duplica", s as any);
+});
+
+test("confirmar() ainda funciona pra mensagem que ficou pending (offline) — pronto pro dia que o agente implementar ack", () => {
+  const r = outbox.enfileirarEEntregar("app-ack-offline", { texto: "oi" });
+  assert.equal(r.entreguesAgora, 0); // offline, fica pending
 
   const ok = outbox.confirmar(r.id!);
   assert.equal(ok, true);
-  assert.equal(outbox.estatisticas()["app-ack"], undefined); // delivered não conta nas estatísticas (só pending/failed)
+  assert.equal(outbox.estatisticas()["app-ack-offline"], undefined);
 
   // confirmar de novo (já delivered) não deve "reabrir" nada
   const ok2 = outbox.confirmar(r.id!);
   assert.equal(ok2, false);
-
-  hub.bridgeHub.remover("app-ack", s as any);
 });
 
 test("varrerPendentes() reenvia pra ponte que só apareceu DEPOIS da mensagem chegar", () => {
