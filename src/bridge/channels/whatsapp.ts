@@ -43,6 +43,12 @@ export const whatsappAdapter: ChannelAdapter = {
   //   { to, text }                                  → mensagem de texto
   //   { to, interactive: { body, buttons:[{id,title}] } } → botões clicáveis (máx 3)
   async send(payload: Record<string, any>, tenant: TenantDef): Promise<SendResult> {
+    // Indicador de "digitando" não existe nesse canal (a API do WhatsApp exige
+    // o id da mensagem original, que o agente não tem aqui) — no-op silencioso
+    // em vez de erro, pra não quebrar o fluxo genérico que manda o mesmo
+    // payload independente do canal.
+    if (payload.typing) return { ok: true };
+
     const { to, text, interactive } = payload;
     const { phoneNumberId, metaToken } = tenant.config;
     const apiVersion = tenant.config.apiVersion || "v20.0";

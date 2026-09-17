@@ -112,6 +112,29 @@ export const teamsAdapter: ChannelAdapter = {
   async send(payload: Record<string, any>, tenant: TenantDef): Promise<SendResult> {
     const { serviceUrl, conversationId, text, file } = payload;
 
+    // Indicador "digitando…": ephemeral, o Teams esconde sozinho depois de
+    // alguns segundos sem atividade nova — por isso o agente manda de novo se
+    // o processamento demorar (mesmo timer do aviso em texto). Sem resposta
+    // pra esperar: falha aqui não pode travar nada, só não mostra o indicador.
+    if (payload.typing) {
+      if (!serviceUrl || !conversationId) {
+        return { ok: false, error: "serviceUrl e conversationId obrigatórios" };
+      }
+      try {
+        const accessToken = await getBotToken(tenant);
+        const uri = activitiesUri(serviceUrl, conversationId);
+        await axios.post(
+          uri,
+          { type: "typing" },
+          { headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" }, timeout: 5_000 },
+        );
+        return { ok: true };
+      } catch (error: any) {
+        const detail = error?.response?.data?.error?.message || error?.message || "erro desconhecido";
+        return { ok: false, error: detail };
+      }
+    }
+
     if (file && file.contentBase64) {
       if (!serviceUrl || !conversationId || !file.name) {
         return { ok: false, error: "serviceUrl, conversationId e file.name obrigatórios" };
