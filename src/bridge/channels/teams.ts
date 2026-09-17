@@ -11,9 +11,12 @@
 // receive: valida JWT (aud == appId), extrai texto + serviceUrl + conversation.
 // send: token AAD (client_credentials) → POST {serviceUrl}/v3/conversations/{id}/activities
 
-import { randomUUID } from "node:crypto";
+import { randomBytes, randomUUID } from "node:crypto";
+import fs from "node:fs";
+import path from "node:path";
 import axios from "axios";
 import { createRemoteJWKSet, jwtVerify } from "jose";
+import { env } from "../../env";
 import type { TenantDef } from "../config";
 import type { ChannelAdapter, IngestResult, SendResult } from "./types";
 
@@ -36,6 +39,26 @@ type PendingFile = {
   conversationId: string;
 };
 const pendingFiles = new Map<string, PendingFile>();
+
+// Envio de arquivo em GRUPO/CANAL: o file consent card acima é documentado pela
+// própria Microsoft como só-1:1 — em grupo ou canal ele é descartado em
+// silêncio (sem invoke, sem erro, sem nada chegando aqui). Achado real:
+// financeiro-digital, grupo do Teams, arquivo nunca chegava (09/09/2026).
+// Contorno: sobe o arquivo no /media (mesma pasta estática que já serve mídia
+// do WhatsApp, ver src/index.ts) com nome imprevisível, e manda o link como
+// mensagem de texto normal — que em grupo funciona igual a 1:1.
+const MEDIA_DIR = path.join(process.cwd(), "media", "teams-arquivos");
+
+export function salvarArquivoPublico(nomeOriginal: string, bytes: Buffer): string {
+  fs.mkdirSync(MEDIA_DIR, { recursive: true });
+  // Nome sem caminho (evita escrever fora da pasta) + token de 16 bytes: o link
+  // só funciona pra quem já tem a URL (mandada dentro do grupo), não é listável.
+  const seguro = path.basename(nomeOriginal).replace(/[\\/]/g, "_").slice(0, 150) || "arquivo";
+  const token = randomBytes(16).toString("hex");
+  const arquivo = `${token}-${seguro}`;
+  fs.writeFileSync(path.join(MEDIA_DIR, arquivo), bytes);
+  return `${env.PUBLIC_BASE_URL.replace(/\/$/, "")}/media/teams-arquivos/${arquivo}`;
+}
 
 export const teamsAdapter: ChannelAdapter = {
   name: "teams",
@@ -107,15 +130,34 @@ export const teamsAdapter: ChannelAdapter = {
 
   // Envio (agente → Teams). Dois modos:
   //   texto:   { serviceUrl, conversationId, text }
-  //   arquivo: { serviceUrl, conversationId, file: { name, contentBase64, description? } }
-  // Arquivo dispara o "file consent card"; o upload real acontece no invoke de aceite.
+  //   arquivo: { serviceUrl, conversationId, file: { name, contentBase64, description? }, groupChat? }
+  // Arquivo em chat 1:1 dispara o "file consent card" (upload real no invoke de
+  // aceite). Arquivo em grupo/canal (groupChat:true) NÃO usa consent card — vira
+  // link em /media (ver salvarArquivoPublico acima), porque o card é ignorado
+  // pelo Teams fora do 1:1.
   async send(payload: Record<string, any>, tenant: TenantDef): Promise<SendResult> {
-    const { serviceUrl, conversationId, text, file } = payload;
+    const { serviceUrl, conversationId, text, file, groupChat } = payload;
 
     if (file && file.contentBase64) {
       if (!serviceUrl || !conversationId || !file.name) {
         return { ok: false, error: "serviceUrl, conversationId e file.name obrigatórios" };
       }
+
+      if (groupChat) {
+        try {
+          const bytes = Buffer.from(file.contentBase64, "base64");
+          const url = salvarArquivoPublico(file.name, bytes);
+          const accessToken = await getBotToken(tenant);
+          const uri = activitiesUri(serviceUrl, conversationId);
+          const legenda = file.description ? `${file.description}\n` : "";
+          const resp = await postarComRetry(uri, accessToken, `📎 ${file.name}\n${legenda}${url}`);
+          return { ok: true, id: resp?.data?.id ?? null };
+        } catch (error: any) {
+          const detail = error?.response?.data?.error?.message || error?.message || "erro desconhecido";
+          return { ok: false, error: detail };
+        }
+      }
+
       // Arquivo nativo: manda o file consent card. O upload real acontece quando o
       // usuário aceita (invoke → handleFileConsent). Guarda os bytes até lá.
       try {
