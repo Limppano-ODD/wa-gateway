@@ -205,3 +205,93 @@ export function pararSweep(): void {
     sweepTimer = null;
   }
 }
+
+// ─── Leitura pra tela ────────────────────────────────────────────────────────
+
+/** Uma mensagem da fila, já legível: quem mandou e o que escreveu. */
+export interface MensagemResumida {
+  id: number;
+  tenant: string;
+  canal: string;
+  status: OutboxRow["status"];
+  attempts: number;
+  criadaEm: string;
+  entregueEm: string | null;
+  de: string;
+  /** aadObjectId (Teams) — é o que entra no allowFrom do agente. */
+  deId: string;
+  texto: string;
+}
+
+// Teto do texto mostrado. A tela é pra reconhecer a mensagem ("foi a minha
+// pergunta das 10h que não chegou"), não pra ler conversa inteira — e o payload
+// de um anexo do Teams tem dezenas de KB que nada acrescentam aqui.
+const MAX_TEXTO = 400;
+
+// Cada canal guarda o payload no seu formato: o Teams manda a Activity quase
+// crua, o WhatsApp manda o envelope da Meta com tudo aninhado dentro de
+// entry[].changes[].value. Sem normalizar aqui, a tela teria que conhecer os
+// dois — e ganharia um terceiro no dia que entrar outro canal.
+function resumir(tenant: string, row: OutboxRow): MensagemResumida {
+  let p: any = {};
+  try {
+    p = JSON.parse(row.payload);
+  } catch {
+    /* linha corrompida: melhor mostrar sem texto do que sumir com ela */
+  }
+
+  let de = "";
+  let deId = "";
+  let texto = "";
+
+  if (p.source === "whatsapp") {
+    const valor = p.entry?.[0]?.changes?.[0]?.value ?? {};
+    const msg = valor.messages?.[0] ?? {};
+    de = valor.contacts?.[0]?.profile?.name || msg.from || "";
+    deId = msg.from || "";
+    texto = msg.text?.body || `(${msg.type || "sem texto"})`;
+  } else {
+    const a = p.raw ?? p;
+    de = a.from?.name || "";
+    deId = a.from?.aadObjectId || a.from?.id || "";
+    texto = a.text || p.text || "";
+    if (!texto && a.attachments?.length) texto = `(${a.attachments.length} anexo(s))`;
+  }
+
+  return {
+    id: row.id,
+    tenant,
+    canal: p.source || "?",
+    status: row.status,
+    attempts: row.attempts,
+    criadaEm: row.createdAt,
+    entregueEm: row.deliveredAt,
+    de,
+    deId,
+    texto: texto.length > MAX_TEXTO ? texto.slice(0, MAX_TEXTO) + "…" : texto,
+  };
+}
+
+/**
+ * Últimas mensagens que passaram pela ponte, mais recente primeiro.
+ *
+ * Existe porque o histórico do painel mostrava só transições de conexão
+ * ("app X saiu, restam 0") — dava pra ver que alguma coisa não foi entregue,
+ * mas não O QUÊ nem DE QUEM. Em 22/09/2026 uma mensagem presa apareceu como
+ * dezenas de linhas vermelhas idênticas e passou a impressão de que horas de
+ * conversa tinham sumido; era uma só, e pra descobrir isso foi preciso abrir o
+ * SQLite na mão dentro do container.
+ *
+ * Devolve campo extraído, nunca o payload cru: ele carrega serviceUrl e ids
+ * internos do canal que não têm o que fazer numa tela.
+ */
+export function recentes(limite = 50, tenant?: string): MensagemResumida[] {
+  if (!disponivel) return [];
+  const teto = Math.min(Math.max(1, Math.trunc(limite) || 50), 200);
+  const linhas = (
+    tenant
+      ? db.prepare(`SELECT * FROM bridge_outbox WHERE tenant = ? ORDER BY id DESC LIMIT ?`).all(tenant, teto)
+      : db.prepare(`SELECT * FROM bridge_outbox ORDER BY id DESC LIMIT ?`).all(teto)
+  ) as any[];
+  return linhas.map((r) => resumir(r.tenant, paraRow(r)));
+}
