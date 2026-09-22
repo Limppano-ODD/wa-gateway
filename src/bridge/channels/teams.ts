@@ -89,7 +89,26 @@ export const teamsAdapter: ChannelAdapter = {
     }
 
     // só interessa mensagem de texto
-    if (activity?.type !== "message") return null;
+    if (activity?.type !== "message") {
+      // Dizer O QUE foi descartado, não só descartar.
+      //
+      // Em 22/09/2026 um bot novo passou uma manhã "sem receber mensagem". O
+      // gateway registrava `POST /ingress/x → 200` e nada mais: nem no log, nem
+      // na fila. Sem saber se o que chegou era conversationUpdate, invoke ou
+      // mensagem que falhou no parse, não dava pra separar "a Microsoft não
+      // está entregando" de "está entregando e a gente está jogando fora" — e a
+      // investigação virou tentativa e erro por horas.
+      //
+      // Uma linha por atividade descartada resolve isso. O volume é baixo
+      // (instalação, entrar/sair de conversa, indicador de digitando); nenhuma
+      // delas chega com frequência de mensagem de chat.
+      console.log(
+        `[teams] atividade ignorada (bot ${tenant.config.appId}): type=${activity?.type ?? "(sem type)"}` +
+          (activity?.name ? ` name=${activity.name}` : "") +
+          (activity?.channelData?.eventType ? ` eventType=${activity.channelData.eventType}` : ""),
+      );
+      return null;
+    }
 
     return {
       push: {

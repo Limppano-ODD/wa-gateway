@@ -329,6 +329,25 @@
         </div>
 
         <div class="card">
+            <h2>💬 Bridge — Mensagens recentes</h2>
+            <p class="muted" style="margin-bottom: 10px;">Quem escreveu e o quê, mais recente primeiro. Vem da fila do outbox, então sobrevive a restart do gateway. Passe o mouse no nome pra ver o id que entra no <code>allowFrom</code> do agente.</p>
+            <table id="bridgeMensagensTable">
+                <thead>
+                    <tr>
+                        <th>Quando</th>
+                        <th>Tenant</th>
+                        <th>Quem</th>
+                        <th>Mensagem</th>
+                        <th>Entrega</th>
+                    </tr>
+                </thead>
+                <tbody id="bridgeMensagensBody">
+                    <tr><td colspan="5" style="text-align: center;">Carregando...</td></tr>
+                </tbody>
+            </table>
+        </div>
+
+        <div class="card">
             <h2>👥 Users</h2>
             <div id="usersMessage"></div>
             <table id="usersTable">
@@ -576,6 +595,10 @@
             entrega_falhou: 'mensagem chegou, app offline'
         };
 
+        function esc(v) {
+            return String(v ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+        }
+
         async function loadBridge() {
             try {
                 const response = await fetch('/admin/bridge', { credentials: 'include' });
@@ -613,12 +636,33 @@
                     eventosBody.innerHTML = data.eventos.map(e => `
                         <tr>
                             <td>${new Date(e.timestamp).toLocaleString()}</td>
-                            <td>${e.app}</td>
+                            <td>${esc(e.app)}</td>
                             <td><span class="badge evento-${e.evento}">${EVENTO_LABEL[e.evento] || e.evento}</span></td>
                             <td>${e.pontesRestantes}</td>
-                            <td>${e.motivo || '-'}</td>
+                            <td>${esc(e.motivo || '-')}</td>
                         </tr>
                     `).join('');
+                }
+
+                const msgBody = document.getElementById('bridgeMensagensBody');
+                if (!data.mensagens || data.mensagens.length === 0) {
+                    msgBody.innerHTML = '<tr><td colspan="5" style="text-align: center;">Nenhuma mensagem na fila</td></tr>';
+                } else {
+                    msgBody.innerHTML = data.mensagens.map(m => {
+                        // "pending há muito tempo" é o sintoma de bot mudo: quem olha
+                        // a tela precisa achar essa linha sem ler as outras.
+                        const classe = m.status === 'pending' ? 'offline' : m.status === 'failed' ? 'evento-entrega_falhou' : 'online';
+                        const rotulo = m.status === 'delivered' ? 'entregue' : m.status === 'pending' ? 'na fila' : 'desistiu';
+                        const quando = m.criadaEm ? new Date(m.criadaEm.replace(' ', 'T') + 'Z').toLocaleString() : '-';
+                        return `
+                        <tr>
+                            <td>${esc(quando)}</td>
+                            <td>${esc(m.tenant)}</td>
+                            <td title="${esc(m.deId || 'sem id')}">${esc(m.de || '-')}</td>
+                            <td>${esc(m.texto || '-')}</td>
+                            <td><span class="badge ${classe}">${rotulo}</span>${m.attempts ? ` <span class="muted">(${m.attempts}x)</span>` : ''}</td>
+                        </tr>`;
+                    }).join('');
                 }
             } catch (error) {
                 showMessage('bridgeMessage', 'Falha ao carregar bridge: ' + error.message, 'error');

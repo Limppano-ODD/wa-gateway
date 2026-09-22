@@ -9,7 +9,7 @@ import { readFileSync } from "fs";
 import { join } from "path";
 import { bridgeHub } from "../bridge/hub";
 import { listarTenants } from "../bridge/config";
-import { estatisticas as estatisticasFila } from "../bridge/outbox";
+import { estatisticas as estatisticasFila, recentes as mensagensRecentes } from "../bridge/outbox";
 
 
 type Variables = {
@@ -206,6 +206,9 @@ export const createAdminController = () => {
       // "pending > 0 há um tempo" é o sinal direto de "esse bot não tá
       // respondendo", sem precisar caçar em log.
       fila: estatisticasFila(),
+      // mensagens: quem escreveu e o quê. A contagem acima diz que alguma coisa
+      // não foi entregue; só isto aqui diz o que foi.
+      mensagens: mensagensRecentes(50),
     });
   });
 
