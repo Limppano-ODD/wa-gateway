@@ -30,3 +30,26 @@ test("corta em parágrafo quando dá, pra não partir tabela no meio", () => {
   assert.ok(partes[0]?.startsWith("bloco um"));
   assert.ok(partes[1]?.startsWith("bloco dois"));
 });
+
+// Envio por pessoa (agent-platform#166): a ponte abre o chat 1:1 do bot.
+import { aadObjectIdValido, corpoCriarConversa, SERVICE_URL_TEAMS } from "./teams.js";
+
+test("aceita só aadObjectId no formato de GUID", () => {
+  assert.ok(aadObjectIdValido("5ef79d00-1cbc-4987-a3fd-fac32b6062a0"));
+  assert.ok(!aadObjectIdValido(""));
+  assert.ok(!aadObjectIdValido("29:1abc"));
+  assert.ok(!aadObjectIdValido("5ef79d00-1cbc-4987-a3fd-fac32b6062a0/../x"));
+});
+
+test("pedido de chat 1:1 leva o bot, a pessoa e o tenant", () => {
+  const c = corpoCriarConversa("app-1", "tenant-1", "5ef79d00-1cbc-4987-a3fd-fac32b6062a0");
+  assert.deepEqual(c.bot, { id: "28:app-1" });
+  assert.deepEqual(c.members, [{ id: "5ef79d00-1cbc-4987-a3fd-fac32b6062a0" }]);
+  assert.equal(c.tenantId, "tenant-1");
+  assert.deepEqual(c.channelData, { tenant: { id: "tenant-1" } });
+  assert.equal(c.isGroup, false);
+});
+
+test("serviceUrl de conversa nova termina em barra (a URL é montada por concatenação)", () => {
+  assert.ok(SERVICE_URL_TEAMS.endsWith("/"));
+});

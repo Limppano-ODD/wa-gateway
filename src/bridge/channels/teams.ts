@@ -108,9 +108,22 @@ export const teamsAdapter: ChannelAdapter = {
   // Envio (agente → Teams). Dois modos:
   //   texto:   { serviceUrl, conversationId, text }
   //   arquivo: { serviceUrl, conversationId, file: { name, contentBase64, description? } }
+  // Em vez de serviceUrl + conversationId, dá pra mandar `userAadObjectId`: a
+  // ponte abre (ou recupera) o chat 1:1 do bot com a pessoa e envia lá. Ver
+  // abrirConversaComPessoa.
   // Arquivo dispara o "file consent card"; o upload real acontece no invoke de aceite.
   async send(payload: Record<string, any>, tenant: TenantDef): Promise<SendResult> {
-    const { serviceUrl, conversationId, text, file } = payload;
+    let { serviceUrl, conversationId } = payload;
+    const { text, file } = payload;
+
+    // Envio por PESSOA: o agente sabe quem avisar, não o endereço da conversa.
+    if (payload.userAadObjectId && !conversationId) {
+      try {
+        ({ serviceUrl, conversationId } = await abrirConversaComPessoa(tenant, String(payload.userAadObjectId)));
+      } catch (error: any) {
+        return { ok: false, error: `não consegui abrir a conversa com a pessoa: ${detalheErro(error)}` };
+      }
+    }
 
     // Indicador "digitando…": ephemeral, o Teams esconde sozinho depois de
     // alguns segundos sem atividade nova — por isso o agente manda de novo se
@@ -250,6 +263,71 @@ async function postarComRetry(uri: string, accessToken: string, text: string, te
     }
   }
   throw ultimoErro;
+}
+
+// ---------------------------------------------------------------------------
+// Conversa 1:1 aberta pelo BOT (mensagem proativa).
+//
+// Pedido de 12/11/2026 (agent-platform#166): o agente avisar sozinho, em horário
+// marcado ou quando algo acontece, sem esperar a pessoa escrever. Testado à mão
+// no mesmo dia, com o bot do gente-digital: o POST abaixo devolveu 201 com o id
+// do chat e a mensagem chegou.
+//
+// O Teams devolve SEMPRE o mesmo chat 1:1 para o mesmo par bot+pessoa, então
+// chamar de novo não cria conversa duplicada. O cache só poupa a ida ao Teams.
+//
+// Pré-requisito do lado do Teams: o app do bot instalado para a pessoa. Sem ele
+// o Teams recusa (403/404) e o erro volta ao agente, sem tentar de novo.
+// ---------------------------------------------------------------------------
+
+// serviceUrl global do Teams. Conversa nova não tem serviceUrl ainda (ele vem na
+// 1ª atividade), e o Bot Framework aceita a criação por este endereço.
+export const SERVICE_URL_TEAMS = "https://smba.trafficmanager.net/teams/";
+
+const conversasPorPessoa = new Map<string, string>(); // `${appId}|${aad}` -> conversationId
+
+const AAD_OBJECT_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+export function aadObjectIdValido(aad: string): boolean {
+  return AAD_OBJECT_ID.test(aad);
+}
+
+// corpoCriarConversa monta o pedido de chat 1:1. Separado pra o teste conferir
+// o formato sem chamar o Teams.
+export function corpoCriarConversa(appId: string, tenantId: string | undefined, aad: string) {
+  return {
+    bot: { id: `28:${appId}` },
+    members: [{ id: aad }],
+    channelData: { tenant: { id: tenantId } },
+    tenantId,
+    isGroup: false,
+  };
+}
+
+async function abrirConversaComPessoa(
+  tenant: TenantDef,
+  aad: string,
+): Promise<{ serviceUrl: string; conversationId: string }> {
+  if (!aadObjectIdValido(aad)) throw new Error(`userAadObjectId inválido: ${aad}`);
+  const { appId, tenantId } = tenant.config;
+  const chave = `${appId}|${aad.toLowerCase()}`;
+  const conhecida = conversasPorPessoa.get(chave);
+  if (conhecida) return { serviceUrl: SERVICE_URL_TEAMS, conversationId: conhecida };
+
+  const accessToken = await getBotToken(tenant);
+  const resp = await axios.post(
+    `${SERVICE_URL_TEAMS}v3/conversations`,
+    corpoCriarConversa(appId, tenantId, aad),
+    { headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" }, timeout: 20_000 },
+  );
+  const id = resp.data?.id;
+  if (!id) throw new Error("o Teams não devolveu o id da conversa");
+  conversasPorPessoa.set(chave, id);
+  return { serviceUrl: SERVICE_URL_TEAMS, conversationId: id };
+}
+
+function detalheErro(error: any): string {
+  return error?.response?.data?.error?.message || error?.message || "erro desconhecido";
 }
 
 // activitiesUri monta a URL pra postar uma activity numa conversa.
