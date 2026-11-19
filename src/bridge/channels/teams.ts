@@ -91,6 +91,15 @@ export const teamsAdapter: ChannelAdapter = {
     // só interessa mensagem de texto
     if (activity?.type !== "message") return null;
 
+    // Imagem colada no chat: só o bot consegue baixar (ver baixarImagensColadas).
+    // Falha aqui não pode perder a mensagem — ela segue sem os bytes e o agente
+    // explica que não abriu a imagem.
+    try {
+      activity = await baixarImagensColadas(activity, tenant);
+    } catch (e: any) {
+      console.error("[teams] imagem colada:", detalheErro(e));
+    }
+
     return {
       push: {
         source: "teams",
@@ -279,6 +288,63 @@ async function postarComRetry(uri: string, accessToken: string, text: string, te
 // Pré-requisito do lado do Teams: o app do bot instalado para a pessoa. Sem ele
 // o Teams recusa (403/404) e o erro volta ao agente, sem tentar de novo.
 // ---------------------------------------------------------------------------
+
+// ---------------------------------------------------------------------------
+// Imagem colada na conversa
+//
+// Arquivo enviado pelo clipe chega com `downloadUrl` já autorizado. Imagem
+// COLADA (ou print) chega diferente: contentType "image/*" e `contentUrl` no
+// próprio Bot Connector, que só entrega com o token do bot. O agente baixava sem
+// token, levava 401 e a imagem sumia (trade-digital, 19/11/2026).
+//
+// Quem tem o token é esta ponte, então é aqui que se baixa: os bytes seguem
+// para o agente em `contentBase64`, e a senha do bot não precisa entrar no
+// container do agente.
+// ---------------------------------------------------------------------------
+
+export const LIMITE_IMAGEM_COLADA = 15 * 1024 * 1024;
+
+// O token do bot só vai para host do Bot Connector/Teams. O endereço vem numa
+// atividade assinada pela Microsoft, mas a trava fica mesmo assim: token vazado
+// para outro host vale para mandar mensagem como o bot.
+export function urlDoBotConnector(u: string): boolean {
+  try {
+    const url = new URL(u);
+    const h = url.hostname.toLowerCase();
+    return url.protocol === "https:" &&
+      (h.endsWith(".trafficmanager.net") || h.endsWith(".botframework.com") || h.endsWith(".teams.microsoft.com"));
+  } catch {
+    return false;
+  }
+}
+
+export function precisaDoTokenDoBot(anexo: any): boolean {
+  return String(anexo?.contentType || "").startsWith("image/") &&
+    typeof anexo?.contentUrl === "string" && urlDoBotConnector(anexo.contentUrl);
+}
+
+async function baixarImagensColadas(activity: any, tenant: TenantDef): Promise<any> {
+  const anexos: any[] = Array.isArray(activity?.attachments) ? activity.attachments : [];
+  if (!anexos.some(precisaDoTokenDoBot)) return activity;
+
+  const accessToken = await getBotToken(tenant);
+  const baixados = await Promise.all(anexos.map(async (a) => {
+    if (!precisaDoTokenDoBot(a)) return a;
+    try {
+      const resp = await axios.get(a.contentUrl, {
+        headers: { Authorization: `Bearer ${accessToken}` },
+        responseType: "arraybuffer",
+        timeout: 10_000,
+        maxContentLength: LIMITE_IMAGEM_COLADA,
+      });
+      return { ...a, contentBase64: Buffer.from(resp.data).toString("base64") };
+    } catch (e: any) {
+      console.error(`[teams] imagem colada não baixou: ${detalheErro(e)}`);
+      return { ...a, erroDownload: detalheErro(e) };
+    }
+  }));
+  return { ...activity, attachments: baixados };
+}
 
 // serviceUrl global do Teams. Conversa nova não tem serviceUrl ainda (ele vem na
 // 1ª atividade), e o Bot Framework aceita a criação por este endereço.
