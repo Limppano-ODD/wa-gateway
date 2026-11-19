@@ -53,3 +53,21 @@ test("pedido de chat 1:1 leva o bot, a pessoa e o tenant", () => {
 test("serviceUrl de conversa nova termina em barra (a URL é montada por concatenação)", () => {
   assert.ok(SERVICE_URL_TEAMS.endsWith("/"));
 });
+
+import { urlDoBotConnector, precisaDoTokenDoBot } from "./teams.js";
+
+test("token do bot só vai para host do Bot Connector, e só por https", () => {
+  assert.equal(urlDoBotConnector("https://smba.trafficmanager.net/amer/v3/attachments/x/views/original"), true);
+  assert.equal(urlDoBotConnector("https://us-api.asm.skype.com.botframework.com/v1/x"), true);
+  assert.equal(urlDoBotConnector("http://smba.trafficmanager.net/amer/v3/attachments/x"), false);
+  assert.equal(urlDoBotConnector("https://evil.example.com/trafficmanager.net"), false);
+  assert.equal(urlDoBotConnector("https://trafficmanager.net.evil.com/x"), false);
+  assert.equal(urlDoBotConnector("não é url"), false);
+});
+
+test("só imagem colada pede o token; arquivo do clipe já vem autorizado", () => {
+  assert.equal(precisaDoTokenDoBot({ contentType: "image/*", contentUrl: "https://smba.trafficmanager.net/amer/v3/attachments/a/views/original" }), true);
+  assert.equal(precisaDoTokenDoBot({ contentType: "application/vnd.microsoft.teams.file.download.info", content: { downloadUrl: "https://x.sharepoint.com/y" } }), false);
+  assert.equal(precisaDoTokenDoBot({ contentType: "text/html", content: "<p>oi</p>" }), false);
+  assert.equal(precisaDoTokenDoBot({ contentType: "image/png", contentUrl: "https://cdn.example.com/a.png" }), false);
+});
