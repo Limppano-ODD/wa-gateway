@@ -33,14 +33,20 @@ jobs:
     steps:
       - name: Set environment based on trigger
         id: set-env
+        # Input do workflow_dispatch entra por env, nunca interpolado direto no
+        # script: `${{ }}` é colado no bash ANTES de rodar, então um valor com
+        # `"; comando` viraria código no runner (#116). E só aceita os dois
+        # valores conhecidos — o `type: choice` vale para a UI, não para quem
+        # dispara pela API.
+        env:
+          INPUT_ENVIRONMENT: ${{ github.event.inputs.environment }}
         run: |
-          if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
-            echo "environment=${{ github.event.inputs.environment }}" >> $GITHUB_OUTPUT
-            if [ "${{ github.event.inputs.environment }}" == "production" ]; then
-              echo "runner=dockerprod" >> $GITHUB_OUTPUT
-            else
-              echo "runner=dockerhml" >> $GITHUB_OUTPUT
-            fi
+          if [ "$GITHUB_EVENT_NAME" == "workflow_dispatch" ]; then
+            case "$INPUT_ENVIRONMENT" in
+              production) echo "environment=production" >> "$GITHUB_OUTPUT"; echo "runner=dockerprod" >> "$GITHUB_OUTPUT" ;;
+              hml)        echo "environment=hml" >> "$GITHUB_OUTPUT";        echo "runner=dockerhml" >> "$GITHUB_OUTPUT" ;;
+              *) echo "::error::environment inválido: use hml ou production"; exit 1 ;;
+            esac
           elif [ "${{ github.ref }}" == "refs/heads/master" ]; then
             echo "environment=production" >> $GITHUB_OUTPUT
             echo "runner=dockerprod" >> $GITHUB_OUTPUT
@@ -111,6 +117,18 @@ jobs:
           rsync -av --exclude='.git' "$GITHUB_WORKSPACE/" "$PROJECT_DIR/"
           echo "Files copied successfully"
           ls -la "$PROJECT_DIR" | head -20
+
+      - name: Ajustar dono dos volumes para o usuário do container
+        # O container roda como `node` (uid 1000) e não mais como root (#124).
+        # db/, wa_credentials/ e media/ foram criados pelo container antigo, como
+        # root — sem isto o processo não consegue gravar a sessão do WhatsApp nem
+        # o sqlite. Usa a imagem base (já em cache no runner) para não depender
+        # de sudo no host. Idempotente: nos deploys seguintes não muda nada.
+        run: |
+          cd "$PROJECT_DIR"
+          mkdir -p db wa_credentials media
+          docker run --rm -v "$PROJECT_DIR:/app" node:22-alpine \
+            chown -R 1000:1000 /app/db /app/wa_credentials /app/media
 
       - name: Fazer deploy via Docker Compose
         id: deploy

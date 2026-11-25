@@ -1,6 +1,5 @@
 import { Hono } from "hono";
 import { logger } from "hono/logger";
-import { cors } from "hono/cors";
 import moment from "moment";
 import { globalErrorMiddleware } from "./middlewares/error.middleware";
 import { notFoundMiddleware } from "./middlewares/notfound.middleware";
@@ -42,7 +41,10 @@ app.use(
     params.map((e) => console.log(`${moment().toISOString()} | ${e}`));
   })
 );
-app.use(cors());
+// Sem CORS de propósito (#111, #87): o painel só chama a própria origem e as
+// rotas de máquina são chamadas servidor-a-servidor, onde CORS não se aplica.
+// O `cors()` padrão refletia qualquer Origin — qualquer site podia ler a
+// resposta da API a partir do browser de quem estivesse logado no painel.
 
 app.onError(globalErrorMiddleware);
 app.notFound(notFoundMiddleware);
@@ -63,8 +65,14 @@ app.get("/", (c) => {
  */
 app.use(
   "/media/*",
+  // Raiz é a pasta media/, não a do projeto (#109): mesmo que um dia apareça
+  // outro bypass de path traversal no serveStatic, o que fica ao alcance é só
+  // mídia — não o .env, o sqlite nem o wa_credentials/.
+  // Continua sem autenticação de propósito: quem recebe o webhook baixa a
+  // mídia por esta URL.
   serveStatic({
-    root: "./",
+    root: "./media",
+    rewriteRequestPath: (p) => p.replace(/^\/media/, ""),
   })
 );
 

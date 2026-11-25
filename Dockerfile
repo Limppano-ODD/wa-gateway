@@ -50,7 +50,15 @@ COPY --from=builder /app/src ./src
 COPY --from=builder /app/tsconfig.json ./tsconfig.json
 
 # Create directories for mounted volumes
-RUN mkdir -p /app/wa_credentials /app/media /app/db
+RUN mkdir -p /app/wa_credentials /app/media /app/db \
+  && chown node:node /app/wa_credentials /app/media /app/db
+
+# Roda sem root (#124). O usuário `node` (uid 1000) já vem na imagem oficial.
+# Só precisa escrever nos três volumes acima — o código e o node_modules ficam
+# do root, somente leitura para o processo. Em produção os volumes são bind
+# mounts do host: o deploy.yml acerta o dono deles para 1000:1000 antes de
+# subir (o que já estava lá foi criado pelo container como root).
+USER node
 
 # Expose port 3002
 EXPOSE 3002

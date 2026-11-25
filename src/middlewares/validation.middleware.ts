@@ -10,6 +10,14 @@ import { HTTPException } from "hono/http-exception";
 import { validator } from "hono/validator";
 import { z, ZodError, ZodSchema } from "zod";
 
+// O zod 4 trocou a mensagem de campo ausente de "Required" para "Invalid
+// input: expected string, received undefined". Quem chama a API (CRM,
+// data-gateway, agent-platform) recebe esse texto no 400 — mantém o de antes
+// para a troca de versão não mudar contrato.
+z.config({
+  customError: (iss) => (iss.input === undefined ? "Required" : undefined),
+});
+
 type Hook<T, E extends Env, P extends string, O = {}> = (
   result:
     | { success: true; data: T }
@@ -73,7 +81,7 @@ export const requestValidator = <
 
     if (!result.success) {
       throw new HTTPException(400, {
-        message: `${result.error.errors[0]?.message} field '${result.error.errors[0]?.path}' on ${target}`,
+        message: `${result.error.issues[0]?.message} field '${result.error.issues[0]?.path}' on ${target}`,
       });
     }
 

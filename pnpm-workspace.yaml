@@ -27,6 +27,18 @@ onlyBuiltDependencies:
 # alem de major bump da lib — fica pra depois, se este passo nao resolver.
 overrides:
   '@whiskeysockets/baileys': 6.7.24
+  # Transitivas do wa-multi-session/baileys com CVE HIGH/CRITICAL (issues de
+  # segurança #85-#141). Todas na mesma major que o pai pede, exceto o
+  # link-preview-js: o baileys pede ^3, mas as correções de SSRF só existem na
+  # 4.x. A API usada (`getLinkPreview(text, opts)`, import dinâmico em
+  # Utils/link-preview.js) é a mesma; se quebrar, o baileys só deixa de gerar
+  # o preview do link — a mensagem sai igual.
+  axios: ^1.21.1
+  form-data: ^4.0.6
+  ws: ^8.23.0
+  sharp: ^0.35.5
+  link-preview-js: ^4.0.4
+  music-metadata: ^11.16.1
 
 # O baileys depende de `libsignal` direto do GitHub — e SEMPRE dependeu: a
 # 6.7.18 que roda hoje usa `github:WhiskeySockets/libsignal-node`. Da 6.7.19 em
