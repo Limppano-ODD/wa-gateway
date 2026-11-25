@@ -118,6 +118,18 @@ jobs:
           echo "Files copied successfully"
           ls -la "$PROJECT_DIR" | head -20
 
+      - name: Ajustar dono dos volumes para o usuário do container
+        # O container roda como `node` (uid 1000) e não mais como root (#124).
+        # db/, wa_credentials/ e media/ foram criados pelo container antigo, como
+        # root — sem isto o processo não consegue gravar a sessão do WhatsApp nem
+        # o sqlite. Usa a imagem base (já em cache no runner) para não depender
+        # de sudo no host. Idempotente: nos deploys seguintes não muda nada.
+        run: |
+          cd "$PROJECT_DIR"
+          mkdir -p db wa_credentials media
+          docker run --rm -v "$PROJECT_DIR:/app" node:22-alpine \
+            chown -R 1000:1000 /app/db /app/wa_credentials /app/media
+
       - name: Fazer deploy via Docker Compose
         id: deploy
         run: |
