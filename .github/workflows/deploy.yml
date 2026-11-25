@@ -33,14 +33,20 @@ jobs:
     steps:
       - name: Set environment based on trigger
         id: set-env
+        # Input do workflow_dispatch entra por env, nunca interpolado direto no
+        # script: `${{ }}` é colado no bash ANTES de rodar, então um valor com
+        # `"; comando` viraria código no runner (#116). E só aceita os dois
+        # valores conhecidos — o `type: choice` vale para a UI, não para quem
+        # dispara pela API.
+        env:
+          INPUT_ENVIRONMENT: ${{ github.event.inputs.environment }}
         run: |
-          if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
-            echo "environment=${{ github.event.inputs.environment }}" >> $GITHUB_OUTPUT
-            if [ "${{ github.event.inputs.environment }}" == "production" ]; then
-              echo "runner=dockerprod" >> $GITHUB_OUTPUT
-            else
-              echo "runner=dockerhml" >> $GITHUB_OUTPUT
-            fi
+          if [ "$GITHUB_EVENT_NAME" == "workflow_dispatch" ]; then
+            case "$INPUT_ENVIRONMENT" in
+              production) echo "environment=production" >> "$GITHUB_OUTPUT"; echo "runner=dockerprod" >> "$GITHUB_OUTPUT" ;;
+              hml)        echo "environment=hml" >> "$GITHUB_OUTPUT";        echo "runner=dockerhml" >> "$GITHUB_OUTPUT" ;;
+              *) echo "::error::environment inválido: use hml ou production"; exit 1 ;;
+            esac
           elif [ "${{ github.ref }}" == "refs/heads/master" ]; then
             echo "environment=production" >> $GITHUB_OUTPUT
             echo "runner=dockerprod" >> $GITHUB_OUTPUT
