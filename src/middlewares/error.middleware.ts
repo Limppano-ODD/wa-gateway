@@ -1,6 +1,6 @@
 import { ErrorHandler } from "hono";
 import { HTTPException } from "hono/http-exception";
-import { StatusCode } from "hono/utils/http-status";
+import { ContentfulStatusCode } from "hono/utils/http-status";
 import { ApplicationError } from "../errors";
 import { env } from "../env";
 
@@ -15,7 +15,7 @@ export const globalErrorMiddleware: ErrorHandler = (err, c) => {
   }
 
   if (ApplicationError.isApplicationError(err)) {
-    return c.json(err.getResponseMessage(), err.code as StatusCode);
+    return c.json(err.getResponseMessage(), err.code as ContentfulStatusCode);
   }
 
   console.error("APP ERROR:", err);
