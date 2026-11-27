@@ -91,16 +91,24 @@ export const teamsAdapter: ChannelAdapter = {
     // só interessa mensagem de texto
     if (activity?.type !== "message") return null;
 
-    // Imagem colada no chat: só o bot consegue baixar (ver baixarImagensColadas).
-    // Falha aqui não pode perder a mensagem — ela segue sem os bytes e o agente
-    // explica que não abriu a imagem.
-    try {
-      activity = await baixarImagensColadas(activity, tenant);
-    } catch (e: any) {
-      console.error("[teams] imagem colada:", detalheErro(e));
-    }
+    // Imagem colada no chat: só o bot consegue baixar (ver baixarImagensColadas),
+    // e só DEPOIS de respondermos ao webhook — por isso vai em `preparar`, que a
+    // rota roda após o 200. Falha não pode perder a mensagem: ela segue sem os
+    // bytes e o agente explica que não abriu a imagem.
+    const temImagemColada = (activity?.attachments || []).some(precisaDoTokenDoBot);
 
     return {
+      preparar: temImagemColada
+        ? async (push: any) => {
+            try {
+              const comBytes = await baixarImagensColadas(push.raw, tenant);
+              return { ...push, raw: comBytes };
+            } catch (e: any) {
+              console.error("[teams] imagem colada:", detalheErro(e));
+              return push;
+            }
+          }
+        : undefined,
       push: {
         source: "teams",
         text: activity.text,
@@ -331,19 +339,47 @@ async function baixarImagensColadas(activity: any, tenant: TenantDef): Promise<a
   const baixados = await Promise.all(anexos.map(async (a) => {
     if (!precisaDoTokenDoBot(a)) return a;
     try {
-      const resp = await axios.get(a.contentUrl, {
-        headers: { Authorization: `Bearer ${accessToken}` },
-        responseType: "arraybuffer",
-        timeout: 10_000,
-        maxContentLength: LIMITE_IMAGEM_COLADA,
-      });
-      return { ...a, contentBase64: Buffer.from(resp.data).toString("base64") };
+      // Bytes como vieram de views/original: sem conversão nem redução, para o
+      // agente ler letra miúda de rótulo na resolução em que a pessoa colou.
+      const dados = await comTentativas(() =>
+        axios.get(a.contentUrl, {
+          headers: { Authorization: `Bearer ${accessToken}` },
+          responseType: "arraybuffer",
+          timeout: TIMEOUT_IMAGEM_COLADA_MS,
+          maxContentLength: LIMITE_IMAGEM_COLADA,
+        }).then((r) => r.data),
+      );
+      return { ...a, contentBase64: Buffer.from(dados).toString("base64") };
     } catch (e: any) {
       console.error(`[teams] imagem colada não baixou: ${detalheErro(e)}`);
       return { ...a, erroDownload: detalheErro(e) };
     }
   }));
   return { ...activity, attachments: baixados };
+}
+
+export const TIMEOUT_IMAGEM_COLADA_MS = 30_000;
+// Espera antes de cada nova tentativa. A imagem recém-colada às vezes ainda não
+// está pronta no primeiro pedido; depois de alguns segundos ela abre.
+export const ESPERAS_IMAGEM_COLADA_MS = [2_000, 5_000];
+
+// comTentativas repete `fn` enquanto falhar, esperando o tempo da vez entre
+// uma tentativa e outra. Arquivo grande demais não adianta repetir.
+export async function comTentativas<T>(
+  fn: () => Promise<T>,
+  esperas: number[] = ESPERAS_IMAGEM_COLADA_MS,
+  dormir: (ms: number) => Promise<void> = (ms) => new Promise((r) => setTimeout(r, ms)),
+): Promise<T> {
+  for (let i = 0; ; i++) {
+    try {
+      return await fn();
+    } catch (e: any) {
+      const grandeDemais = /maxContentLength/i.test(String(e?.message || ""));
+      if (grandeDemais || i >= esperas.length) throw e;
+      console.warn(`[teams] imagem colada: tentativa ${i + 1} falhou (${detalheErro(e)}), tentando de novo`);
+      await dormir(esperas[i] ?? 0);
+    }
+  }
 }
 
 // serviceUrl global do Teams. Conversa nova não tem serviceUrl ainda (ele vem na

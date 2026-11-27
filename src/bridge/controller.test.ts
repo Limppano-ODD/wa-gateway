@@ -133,3 +133,33 @@ test("IP diferente não herda o bloqueio de outro", async () => {
   });
   assert.equal(r.status, 401, "bloqueio vazou entre IPs");
 });
+
+test("mensagem com download lento não é ultrapassada pela seguinte do mesmo tenant", async () => {
+  const { encadear } = await import("./controller");
+  const ordem: string[] = [];
+  const lenta = encadear("bot-ordem", async () => {
+    await new Promise((r) => setTimeout(r, 30));
+    ordem.push("imagem");
+  });
+  const rapida = encadear("bot-ordem", async () => { ordem.push("texto"); });
+  await Promise.all([lenta, rapida]);
+  assert.deepEqual(ordem, ["imagem", "texto"]);
+});
+
+test("falha numa entrada não trava a fila do tenant", async () => {
+  const { encadear } = await import("./controller");
+  const ordem: string[] = [];
+  const quebra = encadear("bot-falha", async () => { throw new Error("download explodiu"); });
+  const depois = encadear("bot-falha", async () => { ordem.push("seguinte"); });
+  await Promise.all([quebra, depois]);
+  assert.deepEqual(ordem, ["seguinte"]);
+});
+
+test("tenants diferentes não esperam um pelo outro", async () => {
+  const { encadear } = await import("./controller");
+  const ordem: string[] = [];
+  const a = encadear("bot-x", async () => { await new Promise((r) => setTimeout(r, 30)); ordem.push("x"); });
+  const b = encadear("bot-y", async () => { ordem.push("y"); });
+  await Promise.all([a, b]);
+  assert.deepEqual(ordem, ["y", "x"]);
+});

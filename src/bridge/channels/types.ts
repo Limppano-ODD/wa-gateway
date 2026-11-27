@@ -18,6 +18,14 @@ export interface IngestResult {
   // um InvokeResponse pro fileConsent/invoke, senão mostra "ação não suportada").
   // Se presente, a rota devolve isso em vez do "ok" padrão.
   response?: { status: number; json?: unknown; body?: string };
+  // trabalho lento que precisa acontecer DEPOIS de responder ao canal, e antes
+  // de o push seguir para a ponte. Recebe o push e devolve o push final.
+  //
+  // Existe por causa da imagem colada no Teams: o anexo só fica disponível
+  // depois que o webhook responde. Baixar dentro do receive() travava a
+  // requisição da Microsoft até o timeout, e toda imagem chegava sem bytes
+  // (marketing-digital, 27/11/2026: "POST /ingress 200 10s" em todos os casos).
+  preparar?: (push: unknown) => Promise<unknown>;
 }
 
 export interface SendResult {

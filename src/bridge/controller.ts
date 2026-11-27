@@ -112,6 +112,20 @@ function adminAutorizado(c: any): { ok: true } | { ok: false; status: number; er
   return { ok: false, status: 401, erro: "token inválido" };
 }
 
+// Fila por tenant: cada entrada só segue para a ponte depois da anterior.
+// Sem `preparar`, a tarefa roda logo e nada muda; com `preparar` (download
+// lento), o 200 já foi devolvido ao canal e a ordem das mensagens se mantém.
+const filas = new Map<string, Promise<void>>();
+export function encadear(tenant: string, tarefa: () => Promise<void>): Promise<void> {
+  const anterior = filas.get(tenant) ?? Promise.resolve();
+  const proxima = anterior.then(tarefa, tarefa).catch(() => {});
+  filas.set(tenant, proxima);
+  proxima.then(() => {
+    if (filas.get(tenant) === proxima) filas.delete(tenant);
+  });
+  return proxima;
+}
+
 export const createBridgeController = () => {
   const app = new Hono();
 
@@ -156,19 +170,30 @@ export const createBridgeController = () => {
       return c.body(r.body ?? "", r.status as any);
     }
     if (result?.push) {
-      // Entrega protegida: antes isto rodava em background com .catch(), então
-      // exceção aqui NUNCA podia afetar a resposta HTTP. Ao trazer pro caminho
-      // síncrono (necessário pro InvokeResponse do Teams), uma exceção subiria
-      // pro middleware de erro e devolveria 500 ao webhook — e 500 pra Meta
-      // significa RETRY, ou seja, mensagem de WhatsApp entregue duas vezes ao
-      // app e possivelmente resposta duplicada pro cliente. O canal já recebeu a
+      // Entrega protegida: exceção aqui não pode virar 500 no webhook — 500 pra
+      // Meta significa RETRY (mensagem duplicada). O canal já recebeu a
       // mensagem; falha na ponte é problema nosso, não motivo pra pedir reenvio.
-      try {
-        const { id, entreguesAgora } = enfileirarEEntregar(name, { type: "message", ...(result.push as object) });
-        console.log(`[bridge] ${adapter.name} → tenant "${name}" (${entreguesAgora} ponte(s), fila#${id ?? "-"})`);
-      } catch (e: any) {
-        console.error(`[bridge] falha entregando na ponte de ${name}:`, e?.message || e);
-      }
+      //
+      // Tudo do mesmo tenant passa pela mesma fila, em ordem: uma mensagem com
+      // imagem (que espera o download em `preparar`) não é ultrapassada pelo
+      // texto que a pessoa mandou logo depois.
+      const { push, preparar } = result;
+      encadear(name, async () => {
+        let final: unknown = push;
+        if (preparar) {
+          try {
+            final = await preparar(push);
+          } catch (e: any) {
+            console.error(`[bridge] preparar falhou para ${name}:`, e?.message || e);
+          }
+        }
+        try {
+          const { id, entreguesAgora } = enfileirarEEntregar(name, { type: "message", ...(final as object) });
+          console.log(`[bridge] ${adapter.name} → tenant "${name}" (${entreguesAgora} ponte(s), fila#${id ?? "-"})`);
+        } catch (e: any) {
+          console.error(`[bridge] falha entregando na ponte de ${name}:`, e?.message || e);
+        }
+      });
     }
     return c.text("ok");
   });
