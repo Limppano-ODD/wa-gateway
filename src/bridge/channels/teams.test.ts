@@ -71,3 +71,36 @@ test("só imagem colada pede o token; arquivo do clipe já vem autorizado", () =
   assert.equal(precisaDoTokenDoBot({ contentType: "text/html", content: "<p>oi</p>" }), false);
   assert.equal(precisaDoTokenDoBot({ contentType: "image/png", contentUrl: "https://cdn.example.com/a.png" }), false);
 });
+
+import { comTentativas } from "./teams.js";
+
+const semEspera = async () => {};
+
+test("imagem colada que ainda não está pronta: tenta de novo e chega", async () => {
+  let chamadas = 0;
+  const r = await comTentativas(async () => {
+    chamadas++;
+    if (chamadas < 3) throw new Error("timeout of 30000ms exceeded");
+    return "bytes";
+  }, [1, 1], semEspera);
+  assert.equal(r, "bytes");
+  assert.equal(chamadas, 3);
+});
+
+test("imagem colada que nunca abre: desiste depois das tentativas e devolve o erro", async () => {
+  let chamadas = 0;
+  await assert.rejects(
+    comTentativas(async () => { chamadas++; throw new Error("timeout"); }, [1, 1], semEspera),
+    /timeout/,
+  );
+  assert.equal(chamadas, 3);
+});
+
+test("imagem grande demais não é baixada de novo", async () => {
+  let chamadas = 0;
+  await assert.rejects(
+    comTentativas(async () => { chamadas++; throw new Error("maxContentLength size of 15728640 exceeded"); }, [1, 1], semEspera),
+    /maxContentLength/,
+  );
+  assert.equal(chamadas, 1);
+});
